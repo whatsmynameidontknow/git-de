@@ -5,7 +5,11 @@
 - **v0.1.0** - Initial release with basic export functionality
 - **v0.2.0** - Preview mode (run without `-o` flag)
 - **v0.3.0** - Verbose mode, progress bar, ignore patterns
-- **v0.4.0** - Include patterns, file size limits, archive export, JSON output, TUI (planned)
+- **v0.4.0-alpha1** - Include patterns ✓
+- **v0.4.0-alpha2** - File size limits (planned)
+- **v0.4.0-alpha3** - Archive export (planned)
+- **v0.4.0-alpha4** - JSON output (planned)
+- **v0.4.0** - TUI + all features (planned)
 
 ---
 
@@ -13,10 +17,10 @@
 
 Staggered release with 5 features in priority order.
 
-### Feature 1: Include Patterns
+### Feature 1: Include Patterns ✅ COMPLETE
 
 **Priority:** 1 (highest)  
-**Release:** v0.4.0-alpha1
+**Release:** v0.4.0-alpha1 ✅
 
 #### Specification
 
