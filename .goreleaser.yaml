@@ -23,7 +23,7 @@ builds:
 
 archives:
   - id: git-de
-    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ if eq .Arch \"amd64\" }}x86_64{{ else }}{{ .Arch }}{{ end }}"
     format_overrides:
       - goos: windows
         format: zip
@@ -33,13 +33,33 @@ checksum:
 
 changelog:
   sort: asc
+  use: github
   filters:
     exclude:
+      - "^ci:"
       - "^docs:"
       - "^test:"
       - "^chore:"
+  groups:
+    - title: "Features"
+      regexp: "^feat[(:]"
+      order: 0
+    - title: "Bug Fixes"
+      regexp: "^fix[(:]"
+      order: 1
+    - title: "Other"
+      order: 999
 
 release:
   github:
     owner: whatsmynameidontknow
     name: git-de
+  footer: |
+    ## Installation
+    
+    Download the appropriate binary for your platform from the assets above.
+    
+    Or install with Go:
+    ```bash
+    go install github.com/whatsmynameidontknow/git-de/cmd/git-de@{{ .Tag }}
+    ```
