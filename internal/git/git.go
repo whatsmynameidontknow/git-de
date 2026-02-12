@@ -160,7 +160,15 @@ func (c *Client) IsFileOutsideRepo(path string) bool {
 }
 
 func (c *Client) GetRecentCommits(n int) ([]Commit, error) {
-	cmd := exec.Command("git", "log", "-n", fmt.Sprintf("%d", n), "--pretty=format:%H %s")
+	return c.getCommits("git", "log", "-n", fmt.Sprintf("%d", n), "--pretty=format:%H %s")
+}
+
+func (c *Client) GetCommitsAfter(after string, n int) ([]Commit, error) {
+	return c.getCommits("git", "log", "-n", fmt.Sprintf("%d", n), "--pretty=format:%H %s", after+"..HEAD")
+}
+
+func (c *Client) getCommits(name string, args ...string) ([]Commit, error) {
+	cmd := exec.Command(name, args...)
 	cmd.Dir = c.workDir
 	
 	output, err := cmd.Output()

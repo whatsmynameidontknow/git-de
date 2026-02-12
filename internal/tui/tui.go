@@ -178,6 +178,18 @@ func (m Model) loadCommitsCmd() tea.Msg {
 	return items
 }
 
+func (m Model) loadToCommitsCmd() tea.Msg {
+	commits, err := m.gitClient.GetCommitsAfter(m.fromCommit, 50)
+	if err != nil {
+		return err
+	}
+	var items []list.Item
+	for _, c := range commits {
+		items = append(items, commitItem{sha: c.Hash, message: c.Message})
+	}
+	return items
+}
+
 func (m Model) loadFilesCmd() tea.Msg {
 	changes, err := m.gitClient.GetChangedFiles(m.fromCommit, m.toCommit)
 	if err != nil {
@@ -259,7 +271,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			h = m.height - 5
 		}
 		m.list = list.New(msg, list.NewDefaultDelegate(), w, h)
-		m.list.Title = "Select Commit"
+		if m.state == stateFromCommit {
+			m.list.Title = "Select From Commit"
+		} else {
+			m.list.Title = "Select To Commit (after " + m.fromCommit[:7] + ")"
+		}
 		return m, nil
 		
 	case []fileItem:
@@ -284,28 +300,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		
-		switch msg.String() {
-		case "ctrl+c", "q":
+		// ctrl+c always quits
+		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
+		}
+		
+		// q only quits when NOT in a list filter mode
+		if msg.String() == "q" {
+			isListState := m.state == stateFromCommit || m.state == stateToCommit
+			if !isListState || !m.list.SettingFilter() {
+				return m, tea.Quit
+			}
 		}
 
 		switch m.state {
 		case stateFromCommit:
-			m.list, cmd = m.list.Update(msg)
-			if msg.String() == "enter" {
-				m.fromCommit = m.list.SelectedItem().(commitItem).sha
-				m.state = stateToCommit
-				m.list.Title = "Select To Commit"
-				return m, nil
+			if msg.String() == "enter" && !m.list.SettingFilter() {
+				if item := m.list.SelectedItem(); item != nil {
+					m.fromCommit = item.(commitItem).sha
+					m.state = stateToCommit
+					return m, m.loadToCommitsCmd
+				}
 			}
+			m.list, cmd = m.list.Update(msg)
 			return m, cmd
 
 		case stateToCommit:
-			m.list, cmd = m.list.Update(msg)
-			if msg.String() == "enter" {
-				m.toCommit = m.list.SelectedItem().(commitItem).sha
-				return m, m.loadFilesCmd
+			if msg.String() == "enter" && !m.list.SettingFilter() {
+				if item := m.list.SelectedItem(); item != nil {
+					m.toCommit = item.(commitItem).sha
+					return m, m.loadFilesCmd
+				}
 			}
+			m.list, cmd = m.list.Update(msg)
 			return m, cmd
 
 		case stateFileSelection:

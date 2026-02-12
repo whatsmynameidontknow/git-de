@@ -227,8 +227,8 @@ func TestUpdate_CommitsLoaded(t *testing.T) {
 	updated, _ := m.Update(items)
 	model := updated.(Model)
 
-	if model.list.Title != "Select Commit" {
-		t.Errorf("Expected list title 'Select Commit', got %s", model.list.Title)
+	if model.list.Title != "Select From Commit" {
+		t.Errorf("Expected list title 'Select From Commit', got %s", model.list.Title)
 	}
 }
 
