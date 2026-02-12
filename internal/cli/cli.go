@@ -21,6 +21,7 @@ type Config struct {
 	IgnorePatterns  []string
 	IncludePatterns []string
 	MaxSize         int64
+	ArchivePath     string
 }
 
 func Parse(args []string) (*Config, error) {
@@ -36,6 +37,7 @@ func Parse(args []string) (*Config, error) {
 	pflag.StringArrayVarP(&config.IgnorePatterns, "ignore", "i", nil, "Ignore patterns (comma-separated or multiple flags)")
 	pflag.StringArrayVarP(&config.IncludePatterns, "include", "I", nil, "Include patterns - only export files matching these (comma-separated or multiple flags)")
 	pflag.StringVar(&maxSizeStr, "max-size", "", "Maximum file size to export (e.g., 10MB, 500KB, 1GB)")
+	pflag.StringVarP(&config.ArchivePath, "archive", "a", "", "Export to archive file (.zip, .tar, .tar.gz, .tgz)")
 
 	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Usage: git-de [options] <from-commit> [<to-commit>]
@@ -56,6 +58,7 @@ Options:
   -i, --ignore string     Ignore patterns (comma-separated or multiple flags)
   -I, --include string    Include patterns - only export files matching these (comma-separated or multiple flags)
       --max-size string   Maximum file size to export (e.g., 10MB, 500KB, 1GB)
+  -a, --archive string    Export to archive file (.zip, .tar, .tar.gz, .tgz)
   -h, --help              Show this help message
 
 Examples:
@@ -63,6 +66,7 @@ Examples:
   git-de --from v1.0.0 --to v2.0.0 --output ./export --concurrent
   git-de HEAD~5 -I "*.go" -i "*_test.go" -o ./export
   git-de HEAD~5 -o ./export --max-size 10MB
+  git-de HEAD~5 -a export.zip
 `)
 	}
 
@@ -129,6 +133,22 @@ Examples:
 			return nil, fmt.Errorf("invalid max-size: %w", err)
 		}
 		config.MaxSize = size
+	}
+
+	// Validate archive path
+	if config.ArchivePath != "" {
+		if config.OutputDir != "" {
+			return nil, fmt.Errorf("cannot use both --output and --archive")
+		}
+		ext := strings.ToLower(config.ArchivePath)
+		validExt := strings.HasSuffix(ext, ".zip") ||
+			strings.HasSuffix(ext, ".tar") ||
+			strings.HasSuffix(ext, ".tar.gz") ||
+			strings.HasSuffix(ext, ".tgz")
+		if !validExt {
+			return nil, fmt.Errorf("unsupported archive format: must be .zip, .tar, .tar.gz, or .tgz")
+		}
+		config.Preview = false
 	}
 
 	return &config, nil

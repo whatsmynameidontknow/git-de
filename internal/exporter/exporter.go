@@ -1,9 +1,13 @@
 package exporter
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/whatsmynameidontknow/git-de/internal/git"
@@ -30,6 +34,7 @@ type Options struct {
 	IgnorePatterns  []string
 	IncludePatterns []string
 	MaxSize         int64
+	ArchivePath     string
 }
 
 type Exporter struct {
@@ -68,6 +73,10 @@ func (e *Exporter) Export() error {
 
 	if e.opts.Preview {
 		return e.runPreview(filesToCopy, changes)
+	}
+
+	if e.opts.ArchivePath != "" {
+		return e.runArchiveExport(filesToCopy, changes)
 	}
 
 	return e.runExport(filesToCopy, changes)
@@ -181,6 +190,129 @@ func (e *Exporter) runExport(files []git.FileChange, allChanges []git.FileChange
 	}
 
 	fmt.Printf("\n✓ Exported %d files to %s\n", total, e.opts.OutputDir)
+	return nil
+}
+
+func (e *Exporter) runArchiveExport(files []git.FileChange, allChanges []git.FileChange) error {
+	archivePath := e.opts.ArchivePath
+	lower := strings.ToLower(archivePath)
+
+	if strings.HasSuffix(lower, ".zip") {
+		return e.exportToZip(files, allChanges)
+	}
+	return e.exportToTarGz(files, allChanges)
+}
+
+func (e *Exporter) exportToZip(files []git.FileChange, allChanges []git.FileChange) error {
+	f, err := os.Create(e.opts.ArchivePath)
+	if err != nil {
+		return fmt.Errorf("failed to create archive: %w", err)
+	}
+	defer f.Close()
+
+	w := zip.NewWriter(f)
+	defer w.Close()
+
+	total := len(files)
+	e.printProgress(0, total)
+
+	for i, file := range files {
+		content, err := e.client.GetFileContent(e.opts.ToCommit, file.Path)
+		if err != nil {
+			fmt.Printf("⚠ Failed to read: %s\n", file.Path)
+			continue
+		}
+
+		fw, err := w.Create(file.Path)
+		if err != nil {
+			return fmt.Errorf("failed to add %s to zip: %w", file.Path, err)
+		}
+
+		if _, err := fw.Write(content); err != nil {
+			return fmt.Errorf("failed to write %s to zip: %w", file.Path, err)
+		}
+
+		if e.opts.Verbose {
+			e.printFileInfo(file)
+		}
+		e.printProgress(i+1, total)
+	}
+
+	// Add summary.txt
+	summary := manifest.Generate(allChanges)
+	fw, err := w.Create("summary.txt")
+	if err != nil {
+		return fmt.Errorf("failed to add summary.txt to zip: %w", err)
+	}
+	if _, err := fw.Write([]byte(summary)); err != nil {
+		return fmt.Errorf("failed to write summary.txt to zip: %w", err)
+	}
+
+	fmt.Printf("\n✓ Archived %d files to %s\n", total, e.opts.ArchivePath)
+	return nil
+}
+
+func (e *Exporter) exportToTarGz(files []git.FileChange, allChanges []git.FileChange) error {
+	f, err := os.Create(e.opts.ArchivePath)
+	if err != nil {
+		return fmt.Errorf("failed to create archive: %w", err)
+	}
+	defer f.Close()
+
+	var tw *tar.Writer
+	lower := strings.ToLower(e.opts.ArchivePath)
+	if strings.HasSuffix(lower, ".tar.gz") || strings.HasSuffix(lower, ".tgz") {
+		gw := gzip.NewWriter(f)
+		defer gw.Close()
+		tw = tar.NewWriter(gw)
+	} else {
+		tw = tar.NewWriter(f)
+	}
+	defer tw.Close()
+
+	total := len(files)
+	e.printProgress(0, total)
+
+	for i, file := range files {
+		content, err := e.client.GetFileContent(e.opts.ToCommit, file.Path)
+		if err != nil {
+			fmt.Printf("⚠ Failed to read: %s\n", file.Path)
+			continue
+		}
+
+		hdr := &tar.Header{
+			Name: file.Path,
+			Mode: 0644,
+			Size: int64(len(content)),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return fmt.Errorf("failed to write tar header for %s: %w", file.Path, err)
+		}
+		if _, err := tw.Write(content); err != nil {
+			return fmt.Errorf("failed to write %s to tar: %w", file.Path, err)
+		}
+
+		if e.opts.Verbose {
+			e.printFileInfo(file)
+		}
+		e.printProgress(i+1, total)
+	}
+
+	// Add summary.txt
+	summary := manifest.Generate(allChanges)
+	hdr := &tar.Header{
+		Name: "summary.txt",
+		Mode: 0644,
+		Size: int64(len(summary)),
+	}
+	if err := tw.WriteHeader(hdr); err != nil {
+		return fmt.Errorf("failed to write summary header: %w", err)
+	}
+	if _, err := tw.Write([]byte(summary)); err != nil {
+		return fmt.Errorf("failed to write summary to tar: %w", err)
+	}
+
+	fmt.Printf("\n✓ Archived %d files to %s\n", total, e.opts.ArchivePath)
 	return nil
 }
 

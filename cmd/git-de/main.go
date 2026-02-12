@@ -29,6 +29,7 @@ func main() {
 		IgnorePatterns:  config.IgnorePatterns,
 		IncludePatterns: config.IncludePatterns,
 		MaxSize:         config.MaxSize,
+		ArchivePath:     config.ArchivePath,
 	}
 
 	exp := exporter.New(client, opts)
