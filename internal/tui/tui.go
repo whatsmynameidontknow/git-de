@@ -332,6 +332,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg
 		return m, nil
 
+	default:
+		// Forward non-key messages (e.g. FilterMatchesMsg, spinner ticks) to the list
+		// so filtering actually works.
+		if m.state == stateFromCommit || m.state == stateToCommit {
+			m.list, cmd = m.list.Update(msg)
+			return m, cmd
+		}
+
 	case tea.KeyMsg:
 		if m.state == stateDone {
 			return m, tea.Quit
