@@ -140,6 +140,61 @@ func TestParse(t *testing.T) {
 				IgnorePatterns:  []string{"*_test.go"},
 			},
 		},
+		{
+			name:    "max-size flag",
+			args:    []string{"--max-size", "10MB", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit: "v1.0.0",
+				ToCommit:   "HEAD",
+				MaxSize:    10 * 1024 * 1024,
+			},
+		},
+		{
+			name:    "max-size with KB",
+			args:    []string{"--max-size", "500KB", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit: "v1.0.0",
+				ToCommit:   "HEAD",
+				MaxSize:    500 * 1024,
+			},
+		},
+		{
+			name:    "max-size with GB",
+			args:    []string{"--max-size", "1GB", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit: "v1.0.0",
+				ToCommit:   "HEAD",
+				MaxSize:    1024 * 1024 * 1024,
+			},
+		},
+		{
+			name:    "max-size plain bytes",
+			args:    []string{"--max-size", "1024", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit: "v1.0.0",
+				ToCommit:   "HEAD",
+				MaxSize:    1024,
+			},
+		},
+		{
+			name:    "max-size short suffix M",
+			args:    []string{"--max-size", "10M", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit: "v1.0.0",
+				ToCommit:   "HEAD",
+				MaxSize:    10 * 1024 * 1024,
+			},
+		},
+		{
+			name:    "invalid max-size",
+			args:    []string{"--max-size", "abc", "v1.0.0"},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -168,6 +223,9 @@ func TestParse(t *testing.T) {
 			if config.Concurrent != tt.wantConfig.Concurrent {
 				t.Errorf("Concurrent = %v, want %v", config.Concurrent, tt.wantConfig.Concurrent)
 			}
+			if config.MaxSize != tt.wantConfig.MaxSize {
+				t.Errorf("MaxSize = %v, want %v", config.MaxSize, tt.wantConfig.MaxSize)
+			}
 		})
 	}
 }
@@ -182,5 +240,44 @@ func TestParse_OutputDirAbsolute(t *testing.T) {
 
 	if config.OutputDir == "" {
 		t.Error("OutputDir should not be empty")
+	}
+}
+
+func TestParseSize(t *testing.T) {
+	tests := []struct {
+		input   string
+		want    int64
+		wantErr bool
+	}{
+		{"0", 0, false},
+		{"1024", 1024, false},
+		{"10B", 10, false},
+		{"10K", 10 * 1024, false},
+		{"10KB", 10 * 1024, false},
+		{"10M", 10 * 1024 * 1024, false},
+		{"10MB", 10 * 1024 * 1024, false},
+		{"1G", 1024 * 1024 * 1024, false},
+		{"1GB", 1024 * 1024 * 1024, false},
+		{"1T", 1024 * 1024 * 1024 * 1024, false},
+		{"1TB", 1024 * 1024 * 1024 * 1024, false},
+		{"500kb", 500 * 1024, false},
+		{"2mb", 2 * 1024 * 1024, false},
+		{"abc", 0, true},
+		{"", 0, true},
+		{"MB", 0, true},
+		{"-1MB", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got, err := ParseSize(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseSize(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ParseSize(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
 	}
 }

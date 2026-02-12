@@ -166,6 +166,59 @@ func TestExporter_Export(t *testing.T) {
 			wantErr:   false,
 			wantFiles: []string{"cmd/main.go", "cmd/app.go"},
 		},
+		{
+			name: "max-size skips large files",
+			opts: Options{
+				FromCommit: "v1.0.0",
+				ToCommit:   "v2.0.0",
+				OutputDir:  "",
+				MaxSize:    20,
+			},
+			changes: []git.FileChange{
+				{Status: "A", Path: "small.go"},
+				{Status: "A", Path: "large.bin"},
+			},
+			files: map[string][]byte{
+				"small.go":  []byte("package main"),
+				"large.bin": make([]byte, 100),
+			},
+			wantErr:   false,
+			wantFiles: []string{"small.go"},
+		},
+		{
+			name: "max-size at exact limit exports file",
+			opts: Options{
+				FromCommit: "v1.0.0",
+				ToCommit:   "v2.0.0",
+				OutputDir:  "",
+				MaxSize:    12,
+			},
+			changes: []git.FileChange{
+				{Status: "A", Path: "exact.go"},
+			},
+			files: map[string][]byte{
+				"exact.go": []byte("package main"),
+			},
+			wantErr:   false,
+			wantFiles: []string{"exact.go"},
+		},
+		{
+			name: "max-size zero means no limit",
+			opts: Options{
+				FromCommit: "v1.0.0",
+				ToCommit:   "v2.0.0",
+				OutputDir:  "",
+				MaxSize:    0,
+			},
+			changes: []git.FileChange{
+				{Status: "A", Path: "big.bin"},
+			},
+			files: map[string][]byte{
+				"big.bin": make([]byte, 1000),
+			},
+			wantErr:   false,
+			wantFiles: []string{"big.bin"},
+		},
 	}
 
 	for _, tt := range tests {
