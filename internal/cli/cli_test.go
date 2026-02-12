@@ -70,12 +70,23 @@ func TestParse(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "defaults to-commit to HEAD",
-			args:    []string{"HEAD~5"},
+			name:    "verbose flag",
+			args:    []string{"--verbose", "v1.0.0"},
 			wantErr: false,
 			wantConfig: Config{
-				FromCommit: "HEAD~5",
+				FromCommit: "v1.0.0",
 				ToCommit:   "HEAD",
+				Verbose:    true,
+			},
+		},
+		{
+			name:    "ignore patterns",
+			args:    []string{"--ignore", "*.log", "--ignore", "node_modules/", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit: "v1.0.0",
+				ToCommit:   "HEAD",
+				IgnorePatterns: []string{"*.log", "node_modules/"},
 			},
 		},
 	}

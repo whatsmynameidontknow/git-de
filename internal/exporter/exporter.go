@@ -20,12 +20,14 @@ type GitClient interface {
 }
 
 type Options struct {
-	FromCommit string
-	ToCommit   string
-	OutputDir  string
-	Overwrite  bool
-	Concurrent bool
-	Preview    bool
+	FromCommit     string
+	ToCommit       string
+	OutputDir      string
+	Overwrite      bool
+	Concurrent     bool
+	Preview        bool
+	Verbose        bool
+	IgnorePatterns []string
 }
 
 type Exporter struct {
@@ -55,37 +57,119 @@ func (e *Exporter) Export() error {
 		return nil
 	}
 
-	filesToCopy := e.filterFiles(changes)
-	
-	if e.opts.Preview {
-		fmt.Println("=== PREVIEW MODE (no files will be copied) ===")
-		fmt.Printf("\nFiles that would be exported (%d):\n", len(filesToCopy))
-		for _, f := range filesToCopy {
-			fmt.Printf("  → %s: %s\n", f.Status, f.Path)
-		}
-		fmt.Println("\n=== Summary ===")
-		fmt.Println(manifest.Generate(changes))
+	filesToCopy := e.filterAndProcess(changes)
+
+	if len(filesToCopy) == 0 {
+		fmt.Println("No files to export after filtering.")
 		return nil
 	}
 
+	if e.opts.Preview {
+		return e.runPreview(filesToCopy, changes)
+	}
+
+	return e.runExport(filesToCopy, changes)
+}
+
+func (e *Exporter) filterAndProcess(changes []git.FileChange) []git.FileChange {
+	var result []git.FileChange
+	for _, c := range changes {
+		// Skip deleted files
+		if c.Status == git.StatusDeleted {
+			fmt.Printf("⚠ Deleted: %s\n", c.Path)
+			continue
+		}
+
+		// Check if should copy
+		if !c.ShouldCopy() {
+			continue
+		}
+
+		// Check ignore patterns
+		if e.shouldIgnore(c.Path) {
+			if e.opts.Verbose {
+				fmt.Printf("⊘ Ignored: %s\n", c.Path)
+			}
+			continue
+		}
+
+		// Check if outside repo
+		if e.client.IsFileOutsideRepo(c.Path) {
+			fmt.Printf("⚠ Outside repo: %s\n", c.Path)
+			continue
+		}
+
+		result = append(result, c)
+	}
+	return result
+}
+
+func (e *Exporter) shouldIgnore(path string) bool {
+	for _, pattern := range e.opts.IgnorePatterns {
+		if matched, _ := filepath.Match(pattern, path); matched {
+			return true
+		}
+		if matched, _ := filepath.Match(pattern, filepath.Base(path)); matched {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *Exporter) runPreview(files []git.FileChange, allChanges []git.FileChange) error {
+	fmt.Println("=== PREVIEW MODE (no files will be copied) ===")
+	fmt.Printf("\nFiles that would be exported (%d):\n", len(files))
+	for _, f := range files {
+		e.printFileInfo(f)
+	}
+	fmt.Println("\n=== Summary ===")
+	fmt.Println(manifest.Generate(allChanges))
+	return nil
+}
+
+func (e *Exporter) runExport(files []git.FileChange, allChanges []git.FileChange) error {
 	if err := e.prepareOutputDir(); err != nil {
 		return err
 	}
-	
+
+	total := len(files)
+	e.printProgress(0, total)
+
 	if e.opts.Concurrent {
-		e.copyConcurrent(filesToCopy)
+		e.copyConcurrent(files, total)
 	} else {
-		e.copySequential(filesToCopy)
+		e.copySequential(files, total)
 	}
 
-	summary := manifest.Generate(changes)
+	summary := manifest.Generate(allChanges)
 	summaryPath := filepath.Join(e.opts.OutputDir, "summary.txt")
 	if err := manifest.WriteToFile(summaryPath, summary); err != nil {
 		return fmt.Errorf("failed to write summary: %w", err)
 	}
 
-	fmt.Printf("✓ Exported %d files to %s\n", len(filesToCopy), e.opts.OutputDir)
+	fmt.Printf("\n✓ Exported %d files to %s\n", total, e.opts.OutputDir)
 	return nil
+}
+
+func (e *Exporter) printFileInfo(f git.FileChange) {
+	switch f.Status {
+	case git.StatusRenamed:
+		fmt.Printf("  → R: %s (from %s)\n", f.Path, f.OldPath)
+	case git.StatusCopied:
+		fmt.Printf("  → C: %s (from %s)\n", f.Path, f.OldPath)
+	default:
+		fmt.Printf("  → %s: %s\n", f.Status, f.Path)
+	}
+}
+
+func (e *Exporter) printProgress(current, total int) {
+	if !e.opts.Verbose {
+		percent := float64(current) / float64(total) * 100
+		fmt.Printf("\r[%3.0f%%] %d/%d files", percent, current, total)
+		if current == total {
+			fmt.Println()
+		}
+	}
 }
 
 func (e *Exporter) validate() error {
@@ -123,29 +207,27 @@ func (e *Exporter) prepareOutputDir() error {
 	return os.MkdirAll(e.opts.OutputDir, 0755)
 }
 
-func (e *Exporter) filterFiles(changes []git.FileChange) []git.FileChange {
-	var result []git.FileChange
-	for _, c := range changes {
-		if c.ShouldCopy() {
-			result = append(result, c)
-		}
-	}
-	return result
-}
-
-func (e *Exporter) copySequential(files []git.FileChange) {
-	for _, f := range files {
+func (e *Exporter) copySequential(files []git.FileChange, total int) {
+	for i, f := range files {
 		e.copyFile(f)
+		e.printProgress(i+1, total)
 	}
 }
 
-func (e *Exporter) copyConcurrent(files []git.FileChange) {
+func (e *Exporter) copyConcurrent(files []git.FileChange, total int) {
 	var wg sync.WaitGroup
+	var counter int
+	var mu sync.Mutex
+
 	for _, f := range files {
 		wg.Add(1)
 		go func(file git.FileChange) {
 			defer wg.Done()
 			e.copyFile(file)
+			mu.Lock()
+			counter++
+			e.printProgress(counter, total)
+			mu.Unlock()
 		}(f)
 	}
 	wg.Wait()
@@ -153,13 +235,11 @@ func (e *Exporter) copyConcurrent(files []git.FileChange) {
 
 func (e *Exporter) copyFile(change git.FileChange) error {
 	if e.client.IsFileOutsideRepo(change.Path) {
-		fmt.Printf("⚠ Skipping file outside repo: %s\n", change.Path)
 		return nil
 	}
 
 	content, err := e.client.GetFileContent(e.opts.ToCommit, change.Path)
 	if err != nil {
-		fmt.Printf("⚠ Failed to get content for %s: %v\n", change.Path, err)
 		return err
 	}
 
@@ -174,11 +254,13 @@ func (e *Exporter) copyFile(change git.FileChange) error {
 		return err
 	}
 
-	switch change.Status {
-	case git.StatusRenamed, git.StatusCopied:
-		fmt.Printf("→ %s (%s → %s)\n", change.Status, change.OldPath, change.Path)
-	default:
-		fmt.Printf("→ %s: %s\n", change.Status, change.Path)
+	if e.opts.Verbose {
+		switch change.Status {
+		case git.StatusRenamed, git.StatusCopied:
+			fmt.Printf("→ %s: %s (from %s)\n", change.Status, change.Path, change.OldPath)
+		default:
+			fmt.Printf("→ %s: %s\n", change.Status, change.Path)
+		}
 	}
 
 	return nil

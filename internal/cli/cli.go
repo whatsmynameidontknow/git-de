@@ -9,12 +9,14 @@ import (
 )
 
 type Config struct {
-	FromCommit string
-	ToCommit   string
-	OutputDir  string
-	Overwrite  bool
-	Concurrent bool
-	Preview    bool
+	FromCommit     string
+	ToCommit       string
+	OutputDir      string
+	Overwrite      bool
+	Concurrent     bool
+	Preview        bool
+	Verbose        bool
+	IgnorePatterns []string
 }
 
 func Parse(args []string) (*Config, error) {
@@ -25,6 +27,8 @@ func Parse(args []string) (*Config, error) {
 	pflag.StringVarP(&config.OutputDir, "output", "o", "", "Output directory")
 	pflag.BoolVarP(&config.Overwrite, "overwrite", "w", false, "Overwrite existing output directory")
 	pflag.BoolVarP(&config.Concurrent, "concurrent", "c", false, "Copy files concurrently")
+	pflag.BoolVarP(&config.Verbose, "verbose", "v", false, "Enable verbose output")
+	pflag.StringArrayVarP(&config.IgnorePatterns, "ignore", "i", nil, "Ignore patterns (can be used multiple times)")
 
 	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Usage: git-de [options] <from-commit> [<to-commit>]
@@ -41,6 +45,8 @@ Options:
   -o, --output string     Output directory (optional, runs in preview mode if not set)
   -w, --overwrite         Overwrite existing output directory
   -c, --concurrent        Copy files concurrently
+  -v, --verbose           Enable verbose output
+  -i, --ignore string     Ignore patterns (can be used multiple times)
   -h, --help              Show this help message
 
 Examples:
