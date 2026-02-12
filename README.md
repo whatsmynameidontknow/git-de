@@ -25,7 +25,7 @@ git-de [options] <from-commit> [<to-commit>]
 
 - `-f, --from` - Starting commit (alternative to positional arg)
 - `-t, --to` - Ending commit (defaults to HEAD)
-- `-o, --output` - Output directory **(required)**
+- `-o, --output` - Output directory (optional, runs in preview mode if not set)
 - `-w, --overwrite` - Overwrite existing output directory
 - `-c, --concurrent` - Copy files concurrently
 - `-h, --help` - Show help
@@ -33,7 +33,10 @@ git-de [options] <from-commit> [<to-commit>]
 ### Examples
 
 ```bash
-# Export changes between HEAD~5 and HEAD
+# Preview changes (no files copied)
+git-de HEAD~5 HEAD
+
+# Export changes to directory
 git-de HEAD~5 HEAD -o ./export
 
 # Export using flags
@@ -46,7 +49,30 @@ git-de main develop -o ./export -c
 git-de HEAD~10 HEAD -o ./export --overwrite
 ```
 
+### Preview Mode
+
+When you don't specify an output directory (`-o`), `git-de` runs in **preview mode**:
+
+```
+=== PREVIEW MODE (no files will be copied) ===
+
+Files that would be exported (3):
+  → A: new.go
+  → M: main.go
+  → R: pkg/utils.go
+
+=== Summary ===
+new files:
+- new.go
+modified:
+- main.go
+renamed:
+- pkg/utils.go (previously pkg/helpers.go)
+```
+
 ## Output
+
+When an output directory is specified:
 
 ```
 export/
@@ -74,6 +100,7 @@ deleted:
 
 ## Features
 
+- ✅ **Preview mode** - See changes without copying files
 - ✅ Copy new, modified, renamed, and copied files
 - ✅ Preserve directory structure
 - ✅ Concurrent file copying (`-c` flag)

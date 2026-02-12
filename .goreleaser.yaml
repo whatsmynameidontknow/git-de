@@ -57,9 +57,6 @@ release:
   footer: |
     ## Installation
     
-    Download the appropriate binary for your platform from the assets above.
-    
-    Or install with Go:
     ```bash
     go install github.com/whatsmynameidontknow/git-de/cmd/git-de@{{ .Tag }}
     ```
