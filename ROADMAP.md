@@ -320,9 +320,19 @@ git-de HEAD~5 HEAD --tui
 │                                         │
 │  Export 4 files to ./export?            │
 │                                         │
-│  [Yes]  [No, go back]  [Cancel]         │
+│  ⚠ Warning: Directory exists and        │
+│     contains 12 files                   │
+│                                         │
+│  [Yes, overwrite]  [No, go back]        │
 └─────────────────────────────────────────┘
 ```
+
+**Output Directory Behavior:**
+- Directory does NOT need to exist beforehand - it will be created
+- If directory exists with files: show warning in confirmation screen
+- If directory exists but empty: no warning
+- If directory doesn't exist: create automatically
+- User confirms overwrite in final step
 
 **Screen 6: Progress**
 ```
@@ -409,7 +419,7 @@ Each release requires:
 2. ~~Should shell completions be included?~~ (No - decided)
 3. ~~JSON output format?~~ (Yes - planned as Feature 4)
 4. ~~Git hooks integration?~~ (No - decided)
-5. CSV output format for scripting?
+5. ~~CSV output format?~~ (No - decided)
 
 ---
 
