@@ -28,6 +28,9 @@ git-de [options] <from-commit> [<to-commit>]
 - `-o, --output` - Output directory (optional, runs in preview mode if not set)
 - `-w, --overwrite` - Overwrite existing output directory
 - `-c, --concurrent` - Copy files concurrently
+- `-v, --verbose` - Enable verbose output
+- `-i, --ignore` - Ignore patterns (comma-separated or multiple flags)
+- `-I, --include` - Include patterns - only export files matching these (comma-separated or multiple flags)
 - `-h, --help` - Show help
 
 ### Examples
@@ -47,6 +50,15 @@ git-de main develop -o ./export -c
 
 # Overwrite existing output directory
 git-de HEAD~10 HEAD -o ./export --overwrite
+
+# Only export .go files (ignore wins in conflicts)
+git-de HEAD~5 HEAD -I "*.go" -i "*_test.go" -o ./export
+
+# Include only specific directories
+git-de HEAD~5 HEAD -I "cmd/*,pkg/*" -o ./export
+
+# Verbose mode with ignore patterns
+git-de HEAD~5 HEAD -o ./export -v -i "*.log,node_modules/"
 ```
 
 ### Preview Mode
@@ -106,6 +118,9 @@ deleted:
 - ✅ Concurrent file copying (`-c` flag)
 - ✅ Plain text summary report
 - ✅ Overwrite protection (`-w` flag)
+- ✅ Verbose mode (`-v` flag)
+- ✅ Ignore patterns (`-i` flag, comma-separated)
+- ✅ Include patterns (`-I` flag, whitelist filtering)
 - ✅ Ignores `.git` directory automatically
 - ✅ Warns about files outside repo root
 
