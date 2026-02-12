@@ -27,6 +27,11 @@ type FileChange struct {
 	OldPath string
 }
 
+type Commit struct {
+	Hash    string
+	Message string
+}
+
 func (fc FileChange) ShouldCopy() bool {
 	return fc.Status == StatusAdded ||
 		fc.Status == StatusModified ||
@@ -150,4 +155,29 @@ func (c *Client) IsFileOutsideRepo(path string) bool {
 		return true
 	}
 	return false
+}
+
+func (c *Client) GetRecentCommits(n int) ([]Commit, error) {
+	cmd := exec.Command("git", "log", "-n", fmt.Sprintf("%d", n), "--pretty=format:%H %s")
+	cmd.Dir = c.workDir
+	
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git log failed: %w", err)
+	}
+	
+	var commits []Commit
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) == 2 {
+			var commit Commit
+			commit.Hash = parts[0]
+			commit.Message = parts[1]
+			commits = append(commits, commit)
+		}
+	}
+	
+	return commits, scanner.Err()
 }

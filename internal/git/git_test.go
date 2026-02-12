@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -319,5 +320,31 @@ func TestClient_IsFileOutsideRepo(t *testing.T) {
 				t.Errorf("IsFileOutsideRepo(%q) = %v, want %v", tt.path, got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestClient_GetRecentCommits(t *testing.T) {
+	repoDir := setupTestRepo(t)
+
+	// Create 3 commits
+	for i := 1; i <= 3; i++ {
+		filename := fmt.Sprintf("file%d.txt", i)
+		os.WriteFile(filepath.Join(repoDir, filename), []byte("content"), 0644)
+		runGit(t, repoDir, "add", filename)
+		runGit(t, repoDir, "commit", "-m", fmt.Sprintf("commit %d", i))
+	}
+
+	c := NewClient(repoDir)
+	commits, err := c.GetRecentCommits(10)
+	if err != nil {
+		t.Fatalf("GetRecentCommits failed: %v", err)
+	}
+
+	if len(commits) != 3 {
+		t.Errorf("Expected 3 commits, got %d", len(commits))
+	}
+
+	if commits[0].Message != "commit 3" {
+		t.Errorf("Expected first commit message to be 'commit 3', got %s", commits[0].Message)
 	}
 }
