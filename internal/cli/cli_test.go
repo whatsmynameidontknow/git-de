@@ -195,6 +195,36 @@ func TestParse(t *testing.T) {
 			args:    []string{"--max-size", "abc", "v1.0.0"},
 			wantErr: true,
 		},
+		{
+			name:    "archive flag",
+			args:    []string{"--archive", "export.zip", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit:  "v1.0.0",
+				ToCommit:    "HEAD",
+				ArchivePath: "export.zip",
+			},
+		},
+		{
+			name:    "archive short flag",
+			args:    []string{"-a", "export.tar.gz", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit:  "v1.0.0",
+				ToCommit:    "HEAD",
+				ArchivePath: "export.tar.gz",
+			},
+		},
+		{
+			name:    "archive and output mutually exclusive",
+			args:    []string{"-a", "export.zip", "-o", "./export", "v1.0.0"},
+			wantErr: true,
+		},
+		{
+			name:    "archive with invalid extension",
+			args:    []string{"-a", "export.rar", "v1.0.0"},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -225,6 +255,9 @@ func TestParse(t *testing.T) {
 			}
 			if config.MaxSize != tt.wantConfig.MaxSize {
 				t.Errorf("MaxSize = %v, want %v", config.MaxSize, tt.wantConfig.MaxSize)
+			}
+			if config.ArchivePath != tt.wantConfig.ArchivePath {
+				t.Errorf("ArchivePath = %v, want %v", config.ArchivePath, tt.wantConfig.ArchivePath)
 			}
 		})
 	}

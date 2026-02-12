@@ -1,6 +1,9 @@
 package exporter
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"os"
 	"path/filepath"
 	"testing"
@@ -317,5 +320,129 @@ func TestExporter_Overwrite(t *testing.T) {
 	_, err = os.Stat(filepath.Join(outputDir, "new.go"))
 	if os.IsNotExist(err) {
 		t.Error("Expected new file to exist")
+	}
+}
+
+func TestExporter_ArchiveZip(t *testing.T) {
+	archivePath := filepath.Join(t.TempDir(), "export.zip")
+
+	mock := &mockGitClient{
+		commits: map[string]bool{"v1.0.0": true, "v2.0.0": true},
+		changes: []git.FileChange{
+			{Status: "A", Path: "main.go"},
+			{Status: "M", Path: "cmd/app.go"},
+		},
+		fileContent: map[string][]byte{
+			"main.go":    []byte("package main"),
+			"cmd/app.go": []byte("package cmd"),
+		},
+	}
+
+	opts := Options{
+		FromCommit:  "v1.0.0",
+		ToCommit:    "v2.0.0",
+		ArchivePath: archivePath,
+	}
+
+	exp := New(mock, opts)
+	err := exp.Export()
+	if err != nil {
+		t.Fatalf("Export() failed: %v", err)
+	}
+
+	// Verify archive exists
+	info, err := os.Stat(archivePath)
+	if os.IsNotExist(err) {
+		t.Fatal("Expected archive file to exist")
+	}
+	if info.Size() == 0 {
+		t.Error("Expected archive file to not be empty")
+	}
+
+	// Verify it's a valid zip by reading it
+	r, err := zip.OpenReader(archivePath)
+	if err != nil {
+		t.Fatalf("Failed to open zip: %v", err)
+	}
+	defer r.Close()
+
+	fileNames := make(map[string]bool)
+	for _, f := range r.File {
+		fileNames[f.Name] = true
+	}
+
+	if !fileNames["main.go"] {
+		t.Error("Expected main.go in zip")
+	}
+	if !fileNames["cmd/app.go"] {
+		t.Error("Expected cmd/app.go in zip")
+	}
+	if !fileNames["summary.txt"] {
+		t.Error("Expected summary.txt in zip")
+	}
+}
+
+func TestExporter_ArchiveTarGz(t *testing.T) {
+	archivePath := filepath.Join(t.TempDir(), "export.tar.gz")
+
+	mock := &mockGitClient{
+		commits: map[string]bool{"v1.0.0": true, "v2.0.0": true},
+		changes: []git.FileChange{
+			{Status: "A", Path: "main.go"},
+		},
+		fileContent: map[string][]byte{
+			"main.go": []byte("package main"),
+		},
+	}
+
+	opts := Options{
+		FromCommit:  "v1.0.0",
+		ToCommit:    "v2.0.0",
+		ArchivePath: archivePath,
+	}
+
+	exp := New(mock, opts)
+	err := exp.Export()
+	if err != nil {
+		t.Fatalf("Export() failed: %v", err)
+	}
+
+	// Verify archive exists and not empty
+	info, err := os.Stat(archivePath)
+	if os.IsNotExist(err) {
+		t.Fatal("Expected archive file to exist")
+	}
+	if info.Size() == 0 {
+		t.Error("Expected archive file to not be empty")
+	}
+
+	// Verify it's a valid tar.gz by reading it
+	f, err := os.Open(archivePath)
+	if err != nil {
+		t.Fatalf("Failed to open file: %v", err)
+	}
+	defer f.Close()
+
+	gzr, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatalf("Failed to create gzip reader: %v", err)
+	}
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+	fileNames := make(map[string]bool)
+	for {
+		hdr, err := tr.Next()
+		if err != nil {
+			break
+		}
+		fileNames[hdr.Name] = true
+	}
+
+	if !fileNames["main.go"] {
+		t.Error("Expected main.go in tar.gz")
+	}
+	if !fileNames["summary.txt"] {
+		t.Error("Expected summary.txt in tar.gz")
 	}
 }
