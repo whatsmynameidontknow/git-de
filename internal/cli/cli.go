@@ -10,14 +10,15 @@ import (
 )
 
 type Config struct {
-	FromCommit     string
-	ToCommit       string
-	OutputDir      string
-	Overwrite      bool
-	Concurrent     bool
-	Preview        bool
-	Verbose        bool
-	IgnorePatterns []string
+	FromCommit      string
+	ToCommit        string
+	OutputDir       string
+	Overwrite       bool
+	Concurrent      bool
+	Preview         bool
+	Verbose         bool
+	IgnorePatterns  []string
+	IncludePatterns []string
 }
 
 func Parse(args []string) (*Config, error) {
@@ -30,6 +31,7 @@ func Parse(args []string) (*Config, error) {
 	pflag.BoolVarP(&config.Concurrent, "concurrent", "c", false, "Copy files concurrently")
 	pflag.BoolVarP(&config.Verbose, "verbose", "v", false, "Enable verbose output")
 	pflag.StringArrayVarP(&config.IgnorePatterns, "ignore", "i", nil, "Ignore patterns (comma-separated or multiple flags)")
+	pflag.StringArrayVarP(&config.IncludePatterns, "include", "I", nil, "Include patterns - only export files matching these (comma-separated or multiple flags)")
 
 	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Usage: git-de [options] <from-commit> [<to-commit>]
@@ -48,11 +50,13 @@ Options:
   -c, --concurrent        Copy files concurrently
   -v, --verbose           Enable verbose output
   -i, --ignore string     Ignore patterns (comma-separated or multiple flags)
+  -I, --include string    Include patterns - only export files matching these (comma-separated or multiple flags)
   -h, --help              Show this help message
 
 Examples:
   git-de HEAD~5 HEAD -o ./export
   git-de --from v1.0.0 --to v2.0.0 --output ./export --concurrent
+  git-de HEAD~5 -I "*.go" -i "*_test.go" -o ./export
 `)
 	}
 
@@ -89,17 +93,28 @@ Examples:
 		config.Preview = true
 	}
 
-	// Split comma-separated patterns
-	var expandedPatterns []string
+	// Split comma-separated patterns for both ignore and include
+	var expandedIgnores []string
 	for _, p := range config.IgnorePatterns {
 		parts := strings.Split(p, ",")
 		for _, part := range parts {
 			if trimmed := strings.TrimSpace(part); trimmed != "" {
-				expandedPatterns = append(expandedPatterns, trimmed)
+				expandedIgnores = append(expandedIgnores, trimmed)
 			}
 		}
 	}
-	config.IgnorePatterns = expandedPatterns
+	config.IgnorePatterns = expandedIgnores
+
+	var expandedIncludes []string
+	for _, p := range config.IncludePatterns {
+		parts := strings.Split(p, ",")
+		for _, part := range parts {
+			if trimmed := strings.TrimSpace(part); trimmed != "" {
+				expandedIncludes = append(expandedIncludes, trimmed)
+			}
+		}
+	}
+	config.IncludePatterns = expandedIncludes
 
 	return &config, nil
 }

@@ -20,14 +20,15 @@ type GitClient interface {
 }
 
 type Options struct {
-	FromCommit     string
-	ToCommit       string
-	OutputDir      string
-	Overwrite      bool
-	Concurrent     bool
-	Preview        bool
-	Verbose        bool
-	IgnorePatterns []string
+	FromCommit      string
+	ToCommit        string
+	OutputDir       string
+	Overwrite       bool
+	Concurrent      bool
+	Preview         bool
+	Verbose         bool
+	IgnorePatterns  []string
+	IncludePatterns []string
 }
 
 type Exporter struct {
@@ -85,7 +86,17 @@ func (e *Exporter) filterAndProcess(changes []git.FileChange) []git.FileChange {
 			continue
 		}
 
-		// Check ignore patterns
+		// Check include patterns first (if any specified)
+		if len(e.opts.IncludePatterns) > 0 {
+			if !e.shouldInclude(c.Path) {
+				if e.opts.Verbose {
+					fmt.Printf("⊘ Not included: %s\n", c.Path)
+				}
+				continue
+			}
+		}
+
+		// Check ignore patterns (ignore wins over include)
 		if e.shouldIgnore(c.Path) {
 			if e.opts.Verbose {
 				fmt.Printf("⊘ Ignored: %s\n", c.Path)
@@ -106,6 +117,18 @@ func (e *Exporter) filterAndProcess(changes []git.FileChange) []git.FileChange {
 
 func (e *Exporter) shouldIgnore(path string) bool {
 	for _, pattern := range e.opts.IgnorePatterns {
+		if matched, _ := filepath.Match(pattern, path); matched {
+			return true
+		}
+		if matched, _ := filepath.Match(pattern, filepath.Base(path)); matched {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *Exporter) shouldInclude(path string) bool {
+	for _, pattern := range e.opts.IncludePatterns {
 		if matched, _ := filepath.Match(pattern, path); matched {
 			return true
 		}

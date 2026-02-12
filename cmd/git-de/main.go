@@ -19,14 +19,15 @@ func main() {
 	client := git.NewClient("")
 	
 	opts := exporter.Options{
-		FromCommit:     config.FromCommit,
-		ToCommit:       config.ToCommit,
-		OutputDir:      config.OutputDir,
-		Overwrite:      config.Overwrite,
-		Concurrent:     config.Concurrent,
-		Preview:        config.Preview,
-		Verbose:        config.Verbose,
-		IgnorePatterns: config.IgnorePatterns,
+		FromCommit:      config.FromCommit,
+		ToCommit:        config.ToCommit,
+		OutputDir:       config.OutputDir,
+		Overwrite:       config.Overwrite,
+		Concurrent:      config.Concurrent,
+		Preview:         config.Preview,
+		Verbose:         config.Verbose,
+		IgnorePatterns:  config.IgnorePatterns,
+		IncludePatterns: config.IncludePatterns,
 	}
 
 	exp := exporter.New(client, opts)
