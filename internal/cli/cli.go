@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -19,10 +20,12 @@ type Config struct {
 	Verbose         bool
 	IgnorePatterns  []string
 	IncludePatterns []string
+	MaxSize         int64
 }
 
 func Parse(args []string) (*Config, error) {
 	var config Config
+	var maxSizeStr string
 
 	pflag.StringVarP(&config.FromCommit, "from", "f", "", "Starting commit")
 	pflag.StringVarP(&config.ToCommit, "to", "t", "", "Ending commit (defaults to HEAD)")
@@ -32,6 +35,7 @@ func Parse(args []string) (*Config, error) {
 	pflag.BoolVarP(&config.Verbose, "verbose", "v", false, "Enable verbose output")
 	pflag.StringArrayVarP(&config.IgnorePatterns, "ignore", "i", nil, "Ignore patterns (comma-separated or multiple flags)")
 	pflag.StringArrayVarP(&config.IncludePatterns, "include", "I", nil, "Include patterns - only export files matching these (comma-separated or multiple flags)")
+	pflag.StringVar(&maxSizeStr, "max-size", "", "Maximum file size to export (e.g., 10MB, 500KB, 1GB)")
 
 	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Usage: git-de [options] <from-commit> [<to-commit>]
@@ -51,12 +55,14 @@ Options:
   -v, --verbose           Enable verbose output
   -i, --ignore string     Ignore patterns (comma-separated or multiple flags)
   -I, --include string    Include patterns - only export files matching these (comma-separated or multiple flags)
+      --max-size string   Maximum file size to export (e.g., 10MB, 500KB, 1GB)
   -h, --help              Show this help message
 
 Examples:
   git-de HEAD~5 HEAD -o ./export
   git-de --from v1.0.0 --to v2.0.0 --output ./export --concurrent
   git-de HEAD~5 -I "*.go" -i "*_test.go" -o ./export
+  git-de HEAD~5 -o ./export --max-size 10MB
 `)
 	}
 
@@ -116,5 +122,64 @@ Examples:
 	}
 	config.IncludePatterns = expandedIncludes
 
+	// Parse max-size
+	if maxSizeStr != "" {
+		size, err := ParseSize(maxSizeStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid max-size: %w", err)
+		}
+		config.MaxSize = size
+	}
+
 	return &config, nil
+}
+
+// ParseSize parses a human-readable size string (e.g., "10MB", "500KB", "1GB") into bytes.
+func ParseSize(s string) (int64, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, fmt.Errorf("empty size string")
+	}
+
+	s = strings.ToUpper(s)
+
+	// Find where the numeric part ends
+	i := 0
+	for i < len(s) && (s[i] >= '0' && s[i] <= '9' || s[i] == '.') {
+		i++
+	}
+
+	if i == 0 {
+		return 0, fmt.Errorf("invalid size: %q", s)
+	}
+
+	numStr := s[:i]
+	suffix := s[i:]
+
+	num, err := strconv.ParseInt(numStr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid size number: %q", numStr)
+	}
+
+	if num < 0 {
+		return 0, fmt.Errorf("size cannot be negative")
+	}
+
+	var multiplier int64
+	switch suffix {
+	case "", "B":
+		multiplier = 1
+	case "K", "KB":
+		multiplier = 1024
+	case "M", "MB":
+		multiplier = 1024 * 1024
+	case "G", "GB":
+		multiplier = 1024 * 1024 * 1024
+	case "T", "TB":
+		multiplier = 1024 * 1024 * 1024 * 1024
+	default:
+		return 0, fmt.Errorf("unknown size suffix: %q", suffix)
+	}
+
+	return num * multiplier, nil
 }

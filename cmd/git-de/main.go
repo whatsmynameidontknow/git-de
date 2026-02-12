@@ -28,6 +28,7 @@ func main() {
 		Verbose:         config.Verbose,
 		IgnorePatterns:  config.IgnorePatterns,
 		IncludePatterns: config.IncludePatterns,
+		MaxSize:         config.MaxSize,
 	}
 
 	exp := exporter.New(client, opts)

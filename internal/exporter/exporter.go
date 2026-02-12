@@ -29,6 +29,7 @@ type Options struct {
 	Verbose         bool
 	IgnorePatterns  []string
 	IncludePatterns []string
+	MaxSize         int64
 }
 
 type Exporter struct {
@@ -108,6 +109,15 @@ func (e *Exporter) filterAndProcess(changes []git.FileChange) []git.FileChange {
 		if e.client.IsFileOutsideRepo(c.Path) {
 			fmt.Printf("⚠ Outside repo: %s\n", c.Path)
 			continue
+		}
+
+		// Check file size limit
+		if e.opts.MaxSize > 0 {
+			content, err := e.client.GetFileContent(e.opts.ToCommit, c.Path)
+			if err == nil && int64(len(content)) > e.opts.MaxSize {
+				fmt.Printf("⚠ Skipped (too large): %s (%s > %s)\n", c.Path, formatSize(int64(len(content))), formatSize(e.opts.MaxSize))
+				continue
+			}
 		}
 
 		result = append(result, c)
@@ -287,4 +297,17 @@ func (e *Exporter) copyFile(change git.FileChange) error {
 	}
 
 	return nil
+}
+
+func formatSize(bytes int64) string {
+	switch {
+	case bytes >= 1024*1024*1024:
+		return fmt.Sprintf("%.1fGB", float64(bytes)/(1024*1024*1024))
+	case bytes >= 1024*1024:
+		return fmt.Sprintf("%.1fMB", float64(bytes)/(1024*1024))
+	case bytes >= 1024:
+		return fmt.Sprintf("%.1fKB", float64(bytes)/1024)
+	default:
+		return fmt.Sprintf("%dB", bytes)
+	}
 }
