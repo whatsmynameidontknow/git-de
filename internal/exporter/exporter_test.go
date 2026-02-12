@@ -102,6 +102,70 @@ func TestExporter_Export(t *testing.T) {
 			wantErr:   false,
 			wantFiles: []string{"kept.go"},
 		},
+		{
+			name: "include patterns filter files",
+			opts: Options{
+				FromCommit:      "v1.0.0",
+				ToCommit:        "v2.0.0",
+				OutputDir:       "",
+				IncludePatterns: []string{"*.go"},
+			},
+			changes: []git.FileChange{
+				{Status: "A", Path: "main.go"},
+				{Status: "M", Path: "README.md"},
+				{Status: "A", Path: "utils.go"},
+			},
+			files: map[string][]byte{
+				"main.go":   []byte("package main"),
+				"README.md": []byte("# README"),
+				"utils.go":  []byte("package utils"),
+			},
+			wantErr:   false,
+			wantFiles: []string{"main.go", "utils.go"},
+		},
+		{
+			name: "include and ignore combined - ignore wins",
+			opts: Options{
+				FromCommit:      "v1.0.0",
+				ToCommit:        "v2.0.0",
+				OutputDir:       "",
+				IncludePatterns: []string{"*.go"},
+				IgnorePatterns:  []string{"*_test.go"},
+			},
+			changes: []git.FileChange{
+				{Status: "A", Path: "main.go"},
+				{Status: "M", Path: "main_test.go"},
+				{Status: "A", Path: "utils.go"},
+			},
+			files: map[string][]byte{
+				"main.go":      []byte("package main"),
+				"main_test.go": []byte("package main"),
+				"utils.go":     []byte("package utils"),
+			},
+			wantErr:   false,
+			wantFiles: []string{"main.go", "utils.go"},
+		},
+		{
+			name: "include with path patterns",
+			opts: Options{
+				FromCommit:      "v1.0.0",
+				ToCommit:        "v2.0.0",
+				OutputDir:       "",
+				IncludePatterns: []string{"cmd/*"},
+			},
+			changes: []git.FileChange{
+				{Status: "A", Path: "cmd/main.go"},
+				{Status: "M", Path: "pkg/utils.go"},
+				{Status: "A", Path: "cmd/app.go"},
+			},
+			files: map[string][]byte{
+				"cmd/main.go":  []byte("package main"),
+				"pkg/utils.go": []byte("package pkg"),
+				"cmd/app.go":   []byte("package main"),
+			},
+			wantErr:   false,
+			wantFiles: []string{"cmd/main.go", "cmd/app.go"},
+		},
 	}
 
 	for _, tt := range tests {

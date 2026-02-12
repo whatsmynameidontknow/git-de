@@ -99,6 +99,47 @@ func TestParse(t *testing.T) {
 				IgnorePatterns: []string{"*.log", "*.tmp", "node_modules/"},
 			},
 		},
+		{
+			name:    "include patterns",
+			args:    []string{"--include", "*.go", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit:     "v1.0.0",
+				ToCommit:       "HEAD",
+				IncludePatterns: []string{"*.go"},
+			},
+		},
+		{
+			name:    "multiple include patterns",
+			args:    []string{"--include", "*.go", "--include", "*.md", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit:      "v1.0.0",
+				ToCommit:        "HEAD",
+				IncludePatterns: []string{"*.go", "*.md"},
+			},
+		},
+		{
+			name:    "comma-separated include patterns",
+			args:    []string{"--include", "*.go, *.md, Makefile", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit:      "v1.0.0",
+				ToCommit:        "HEAD",
+				IncludePatterns: []string{"*.go", "*.md", "Makefile"},
+			},
+		},
+		{
+			name:    "include and ignore combined",
+			args:    []string{"--include", "*.go", "--ignore", "*_test.go", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit:      "v1.0.0",
+				ToCommit:        "HEAD",
+				IncludePatterns: []string{"*.go"},
+				IgnorePatterns:  []string{"*_test.go"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
