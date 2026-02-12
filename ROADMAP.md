@@ -5,13 +5,13 @@
 - **v0.1.0** - Initial release with basic export functionality
 - **v0.2.0** - Preview mode (run without `-o` flag)
 - **v0.3.0** - Verbose mode, progress bar, ignore patterns
-- **v0.4.0** - Include patterns, file size limits, archive export, TUI (planned)
+- **v0.4.0** - Include patterns, file size limits, archive export, JSON output, TUI (planned)
 
 ---
 
 ## v0.4.0 Roadmap
 
-Staggered release with 4 features in priority order.
+Staggered release with 5 features in priority order.
 
 ### Feature 1: Include Patterns
 
@@ -157,9 +157,86 @@ git-de HEAD~5 -o ./export -a export.zip
 
 ---
 
-### Feature 4: TUI (Terminal User Interface)
+### Feature 4: JSON Output
 
-**Priority:** 4 (lowest)  
+**Priority:** 4  
+**Release:** v0.4.0-alpha4
+
+#### Specification
+
+Add `--json` flag to output results in JSON format for scripting and integration.
+
+**Behavior:**
+- If no value provided, print JSON to stdout
+- If value provided, write JSON to specified file
+- Includes metadata (commits, timestamp) and file details
+- Shows export status for each file (exported or skipped with reason)
+- Works with all other flags (include, ignore, max-size, etc.)
+
+**CLI Changes:**
+```bash
+# Print JSON to stdout
+git-de HEAD~5 HEAD --json
+
+# Write JSON to file
+git-de HEAD~5 HEAD --json export-report.json
+
+# Combine with other flags
+git-de HEAD~5 HEAD -I "*.go" --json report.json -v
+```
+
+**JSON Structure:**
+```json
+{
+  "from_commit": "abc1234",
+  "to_commit": "def5678",
+  "exported_at": "2026-02-12T23:25:00Z",
+  "summary": {
+    "total_files": 5,
+    "added": 2,
+    "modified": 2,
+    "renamed": 1,
+    "deleted": 1,
+    "skipped": {
+      "ignored": 0,
+      "too_large": 0,
+      "outside_repo": 0
+    }
+  },
+  "files": [
+    {
+      "path": "cmd/main.go",
+      "status": "A",
+      "size": 1024,
+      "exported": true
+    },
+    {
+      "path": "old/file.txt",
+      "status": "D",
+      "size": 0,
+      "exported": false,
+      "reason": "deleted"
+    }
+  ]
+}
+```
+
+**Implementation Notes:**
+- Add `JSONOutput string` to config (empty = stdout, path = file)
+- Add `JSON bool` flag to enable JSON mode
+- Create `internal/report` package for JSON generation
+- Export runs normally, but instead of text output, generate JSON
+- Add test cases for:
+  - JSON output to stdout
+  - JSON output to file
+  - JSON structure validation
+  - JSON with various skip reasons
+
+---
+
+### Feature 5: TUI (Terminal User Interface)
+
+**Priority:** 5 (lowest)  
 **Release:** v0.4.0 (final)
 
 #### Specification
@@ -314,6 +391,7 @@ Each feature requires:
 | v0.4.0-alpha1 | Include patterns | TBD |
 | v0.4.0-alpha2 | File size limit | TBD |
 | v0.4.0-alpha3 | Archive export | TBD |
+| v0.4.0-alpha4 | JSON output | TBD |
 | v0.4.0 | TUI + all features | TBD |
 
 ### Documentation Updates
@@ -327,10 +405,11 @@ Each release requires:
 
 ## Open Questions
 
-1. Should config file support be added? (e.g., `.git-de.yaml`)
-2. Should shell completions be included?
-3. JSON/CSV output format for scripting?
-4. Git hooks integration?
+1. ~~Should config file support be added?~~ (No - decided)
+2. ~~Should shell completions be included?~~ (No - decided)
+3. ~~JSON output format?~~ (Yes - planned as Feature 4)
+4. ~~Git hooks integration?~~ (No - decided)
+5. CSV output format for scripting?
 
 ---
 
