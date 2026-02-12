@@ -112,6 +112,10 @@ type Model struct {
 	files      []fileItem
 	cursor     int
 	
+	// Window size
+	width  int
+	height int
+	
 	// Progress tracking
 	totalFiles int
 	doneFiles  int
@@ -247,7 +251,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case []list.Item:
-		m.list = list.New(msg, list.NewDefaultDelegate(), 60, 20)
+		w, h := 60, 20
+		if m.width > 0 {
+			w = m.width
+		}
+		if m.height > 5 {
+			h = m.height - 5
+		}
+		m.list = list.New(msg, list.NewDefaultDelegate(), w, h)
 		m.list.Title = "Select Commit"
 		return m, nil
 		
@@ -350,7 +361,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.WindowSizeMsg:
-		m.list.SetSize(msg.Width, msg.Height-5)
+		m.width = msg.Width
+		m.height = msg.Height
+		if len(m.list.Items()) > 0 {
+			m.list.SetSize(msg.Width, msg.Height-5)
+		}
 		m.progress.Width = msg.Width - 10
 	}
 
