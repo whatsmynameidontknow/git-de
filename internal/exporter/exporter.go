@@ -33,7 +33,10 @@ type Exporter struct {
 }
 
 func New(client GitClient, opts Options) *Exporter {
-	return &Exporter{client: client, opts: opts}
+	var e Exporter
+	e.client = client
+	e.opts = opts
+	return &e
 }
 
 func (e *Exporter) Export() error {

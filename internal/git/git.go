@@ -39,7 +39,9 @@ type Client struct {
 }
 
 func NewClient(workDir string) *Client {
-	return &Client{workDir: workDir}
+	var c Client
+	c.workDir = workDir
+	return &c
 }
 
 func (c *Client) IsGitRepository() bool {

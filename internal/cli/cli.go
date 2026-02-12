@@ -17,7 +17,7 @@ type Config struct {
 }
 
 func Parse(args []string) (*Config, error) {
-	config := &Config{}
+	var config Config
 
 	pflag.StringVarP(&config.FromCommit, "from", "f", "", "Starting commit")
 	pflag.StringVarP(&config.ToCommit, "to", "t", "", "Ending commit (defaults to HEAD)")
@@ -78,5 +78,5 @@ Examples:
 		config.OutputDir = absPath
 	}
 
-	return config, nil
+	return &config, nil
 }
