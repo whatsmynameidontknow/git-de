@@ -225,6 +225,28 @@ func TestParse(t *testing.T) {
 			args:    []string{"-a", "export.rar", "v1.0.0"},
 			wantErr: true,
 		},
+		{
+			name:    "json flag no value",
+			args:    []string{"--json", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit: "v1.0.0",
+				ToCommit:   "HEAD",
+				JSON:       true,
+				JSONFile:   "",
+			},
+		},
+		{
+			name:    "json flag with file",
+			args:    []string{"--json", "--json-file", "report.json", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit: "v1.0.0",
+				ToCommit:   "HEAD",
+				JSON:       true,
+				JSONFile:   "report.json",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -258,6 +280,12 @@ func TestParse(t *testing.T) {
 			}
 			if config.ArchivePath != tt.wantConfig.ArchivePath {
 				t.Errorf("ArchivePath = %v, want %v", config.ArchivePath, tt.wantConfig.ArchivePath)
+			}
+			if config.JSON != tt.wantConfig.JSON {
+				t.Errorf("JSON = %v, want %v", config.JSON, tt.wantConfig.JSON)
+			}
+			if config.JSONFile != tt.wantConfig.JSONFile {
+				t.Errorf("JSONFile = %v, want %v", config.JSONFile, tt.wantConfig.JSONFile)
 			}
 		})
 	}

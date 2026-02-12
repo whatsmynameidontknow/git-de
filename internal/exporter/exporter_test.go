@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -444,5 +445,73 @@ func TestExporter_ArchiveTarGz(t *testing.T) {
 	}
 	if !fileNames["summary.txt"] {
 		t.Error("Expected summary.txt in tar.gz")
+	}
+}
+
+func TestExporter_JSONOutput(t *testing.T) {
+	jsonPath := filepath.Join(t.TempDir(), "report.json")
+
+	mock := &mockGitClient{
+		commits: map[string]bool{"v1.0.0": true, "v2.0.0": true},
+		changes: []git.FileChange{
+			{Status: "A", Path: "main.go"},
+			{Status: "M", Path: "utils.go"},
+			{Status: "D", Path: "old.go"},
+		},
+		fileContent: map[string][]byte{
+			"main.go":  []byte("package main"),
+			"utils.go": []byte("package utils"),
+		},
+	}
+
+	outputDir := t.TempDir() + "/output"
+	opts := Options{
+		FromCommit: "v1.0.0",
+		ToCommit:   "v2.0.0",
+		OutputDir:  outputDir,
+		JSON:       true,
+		JSONFile:   jsonPath,
+	}
+
+	exp := New(mock, opts)
+	err := exp.Export()
+	if err != nil {
+		t.Fatalf("Export() failed: %v", err)
+	}
+
+	// Verify JSON file exists
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatalf("Failed to read JSON file: %v", err)
+	}
+
+	// Verify it's valid JSON
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("Invalid JSON: %v", err)
+	}
+
+	// Check required fields
+	if result["from_commit"] != "v1.0.0" {
+		t.Errorf("from_commit = %v, want v1.0.0", result["from_commit"])
+	}
+	if result["to_commit"] != "v2.0.0" {
+		t.Errorf("to_commit = %v, want v2.0.0", result["to_commit"])
+	}
+
+	files, ok := result["files"].([]interface{})
+	if !ok {
+		t.Fatal("Expected files array in JSON")
+	}
+	if len(files) != 3 {
+		t.Errorf("Expected 3 files in JSON, got %d", len(files))
+	}
+
+	summary, ok := result["summary"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected summary object in JSON")
+	}
+	if summary["total_files"].(float64) != 3 {
+		t.Errorf("Expected total_files=3, got %v", summary["total_files"])
 	}
 }
