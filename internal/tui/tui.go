@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/progress"
@@ -108,9 +109,12 @@ type Model struct {
 	progress   progress.Model
 	
 	// Data
-	commits    []commitItem
-	files      []fileItem
-	cursor     int
+	commits       []commitItem
+	files         []fileItem
+	filteredIdx   []int // indices into files for current filter
+	cursor        int
+	filterMode    bool
+	filterInput   textinput.Model
 	
 	// Window size
 	width  int
@@ -128,14 +132,19 @@ func NewModel(client *git.Client, from, to string) Model {
 	ti.SetValue("./export")
 	ti.Focus()
 
+	fi := textinput.New()
+	fi.Placeholder = "type to filter..."
+	fi.Prompt = "/ "
+
 	prog := progress.New(progress.WithDefaultGradient())
 
 	m := Model{
-		gitClient:  client,
-		input:      ti,
-		progress:   prog,
-		fromCommit: from,
-		toCommit:   to,
+		gitClient:   client,
+		input:       ti,
+		filterInput: fi,
+		progress:    prog,
+		fromCommit:  from,
+		toCommit:    to,
 	}
 
 	if from != "" && to != "" {
@@ -258,6 +267,29 @@ func (m Model) startExport() tea.Cmd {
 	}
 }
 
+func (m *Model) ensureFilterIdx() {
+	if m.filteredIdx == nil && len(m.files) > 0 {
+		m.filteredIdx = make([]int, len(m.files))
+		for i := range m.files {
+			m.filteredIdx[i] = i
+		}
+	}
+}
+
+func (m *Model) rebuildFilter() {
+	query := strings.ToLower(m.filterInput.Value())
+	m.filteredIdx = m.filteredIdx[:0]
+	for i, f := range m.files {
+		if query == "" || strings.Contains(strings.ToLower(f.path), query) ||
+			strings.Contains(strings.ToLower(string(f.status)), query) {
+			m.filteredIdx = append(m.filteredIdx, i)
+		}
+	}
+	if m.cursor >= len(m.filteredIdx) {
+		m.cursor = max(0, len(m.filteredIdx)-1)
+	}
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -281,6 +313,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case []fileItem:
 		m.files = msg
 		m.state = stateFileSelection
+		m.filteredIdx = make([]int, len(msg))
+		for i := range msg {
+			m.filteredIdx[i] = i
+		}
+		m.cursor = 0
 		return m, nil
 
 	case progressMsg:
@@ -305,12 +342,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		
-		// q only quits when NOT in a list filter mode
+		// q only quits when NOT in a filter mode
 		if msg.String() == "q" {
-			isListState := m.state == stateFromCommit || m.state == stateToCommit
-			if !isListState || !m.list.SettingFilter() {
-				return m, tea.Quit
+			if m.filterMode {
+				break
 			}
+			isListState := m.state == stateFromCommit || m.state == stateToCommit
+			if isListState && m.list.SettingFilter() {
+				break
+			}
+			return m, tea.Quit
 		}
 
 		switch m.state {
@@ -336,28 +377,58 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 
 		case stateFileSelection:
+			m.ensureFilterIdx()
+			if m.filterMode {
+				switch msg.String() {
+				case "esc":
+					m.filterMode = false
+					m.filterInput.Blur()
+					return m, nil
+				case "enter":
+					m.filterMode = false
+					m.filterInput.Blur()
+					return m, nil
+				default:
+					m.filterInput, cmd = m.filterInput.Update(msg)
+					m.rebuildFilter()
+					return m, cmd
+				}
+			}
+
 			switch msg.String() {
+			case "/":
+				m.filterMode = true
+				m.filterInput.Focus()
+				return m, nil
 			case "up", "k":
 				if m.cursor > 0 {
 					m.cursor--
 				}
 			case "down", "j":
-				if m.cursor < len(m.files)-1 {
+				if m.cursor < len(m.filteredIdx)-1 {
 					m.cursor++
 				}
 			case " ": // Toggle
-				if !m.files[m.cursor].disabled {
-					m.files[m.cursor].selected = !m.files[m.cursor].selected
-				}
-			case "a": // Select all
-				for i := range m.files {
-					if !m.files[i].disabled {
-						m.files[i].selected = true
+				if len(m.filteredIdx) > 0 {
+					idx := m.filteredIdx[m.cursor]
+					if !m.files[idx].disabled {
+						m.files[idx].selected = !m.files[idx].selected
 					}
 				}
-			case "n": // Select none
-				for i := range m.files {
-					m.files[i].selected = false
+			case "a": // Select all (visible)
+				for _, idx := range m.filteredIdx {
+					if !m.files[idx].disabled {
+						m.files[idx].selected = true
+					}
+				}
+			case "n": // Select none (visible)
+				for _, idx := range m.filteredIdx {
+					m.files[idx].selected = false
+				}
+			case "backspace":
+				if m.filterInput.Value() != "" {
+					m.filterInput.SetValue("")
+					m.rebuildFilter()
 				}
 			case "enter":
 				m.state = stateOutputPath
@@ -410,20 +481,58 @@ func (m Model) View() string {
 
 	case stateFileSelection:
 		s += "Select Files to Export:\n\n"
-		for i, f := range m.files {
+		
+		if m.filterMode || m.filterInput.Value() != "" {
+			s += m.filterInput.View() + "\n\n"
+		}
+
+		displayIdx := m.filteredIdx
+		if displayIdx == nil {
+			displayIdx = make([]int, len(m.files))
+			for i := range m.files {
+				displayIdx[i] = i
+			}
+		}
+
+		visibleStart := 0
+		visibleEnd := len(displayIdx)
+		maxVisible := m.height - 10
+		if maxVisible < 5 {
+			maxVisible = 20
+		}
+		if visibleEnd > maxVisible {
+			half := maxVisible / 2
+			visibleStart = m.cursor - half
+			if visibleStart < 0 {
+				visibleStart = 0
+			}
+			visibleEnd = visibleStart + maxVisible
+			if visibleEnd > len(displayIdx) {
+				visibleEnd = len(displayIdx)
+				visibleStart = visibleEnd - maxVisible
+			}
+		}
+
+		for vi := visibleStart; vi < visibleEnd; vi++ {
+			f := m.files[displayIdx[vi]]
 			cursor := " "
-			if m.cursor == i {
+			if m.cursor == vi {
 				cursor = ">"
 			}
 			
 			line := f.Title()
-			if m.cursor == i {
+			if m.cursor == vi {
 				line = selectedStyle.Render(line)
 			}
 			
 			s += fmt.Sprintf("%s %s\n", cursor, line)
 		}
-		s += "\n[Space:toggle] [A:all] [N:none] [Enter:continue] [Q:quit]\n"
+
+		s += fmt.Sprintf("\n%d/%d files", len(displayIdx), len(m.files))
+		if m.filterInput.Value() != "" {
+			s += fmt.Sprintf(" (filter: %s)", m.filterInput.Value())
+		}
+		s += "\n[/:filter] [Space:toggle] [A:all] [N:none] [Enter:continue] [Q:quit]\n"
 
 	case stateOutputPath:
 		s += "Enter Output Directory:\n\n"
