@@ -16,11 +16,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if config.OutputDir == "" {
-		fmt.Fprintf(os.Stderr, "Error: output directory is required (use -o or --output)\n")
-		os.Exit(1)
-	}
-
 	client := git.NewClient("")
 	
 	opts := exporter.Options{
@@ -29,6 +24,7 @@ func main() {
 		OutputDir:  config.OutputDir,
 		Overwrite:  config.Overwrite,
 		Concurrent: config.Concurrent,
+		Preview:    config.Preview,
 	}
 
 	exp := exporter.New(client, opts)

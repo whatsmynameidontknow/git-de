@@ -14,6 +14,7 @@ type Config struct {
 	OutputDir  string
 	Overwrite  bool
 	Concurrent bool
+	Preview    bool
 }
 
 func Parse(args []string) (*Config, error) {
@@ -37,7 +38,7 @@ Arguments:
 Options:
   -f, --from string       Starting commit (alternative to positional)
   -t, --to string         Ending commit (defaults to HEAD)
-  -o, --output string     Output directory (required)
+  -o, --output string     Output directory (optional, runs in preview mode if not set)
   -w, --overwrite         Overwrite existing output directory
   -c, --concurrent        Copy files concurrently
   -h, --help              Show this help message
@@ -76,6 +77,9 @@ Examples:
 			return nil, fmt.Errorf("invalid output directory: %w", err)
 		}
 		config.OutputDir = absPath
+		config.Preview = false
+	} else {
+		config.Preview = true
 	}
 
 	return &config, nil

@@ -25,6 +25,7 @@ type Options struct {
 	OutputDir  string
 	Overwrite  bool
 	Concurrent bool
+	Preview    bool
 }
 
 type Exporter struct {
@@ -54,11 +55,22 @@ func (e *Exporter) Export() error {
 		return nil
 	}
 
+	filesToCopy := e.filterFiles(changes)
+	
+	if e.opts.Preview {
+		fmt.Println("=== PREVIEW MODE (no files will be copied) ===")
+		fmt.Printf("\nFiles that would be exported (%d):\n", len(filesToCopy))
+		for _, f := range filesToCopy {
+			fmt.Printf("  → %s: %s\n", f.Status, f.Path)
+		}
+		fmt.Println("\n=== Summary ===")
+		fmt.Println(manifest.Generate(changes))
+		return nil
+	}
+
 	if err := e.prepareOutputDir(); err != nil {
 		return err
 	}
-
-	filesToCopy := e.filterFiles(changes)
 	
 	if e.opts.Concurrent {
 		e.copyConcurrent(filesToCopy)

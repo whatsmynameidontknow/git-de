@@ -18,14 +18,16 @@ func TestParse(t *testing.T) {
 		wantConfig Config
 	}{
 		{
-			name:    "positional args only",
+			name:    "no output flag runs in preview mode",
 			args:    []string{"HEAD~5", "HEAD"},
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit: "HEAD~5",
 				ToCommit:   "HEAD",
+				OutputDir:  "",
 				Overwrite:  false,
 				Concurrent: false,
+				Preview:    true,
 			},
 		},
 		{
