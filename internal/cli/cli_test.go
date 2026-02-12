@@ -84,9 +84,19 @@ func TestParse(t *testing.T) {
 			args:    []string{"--ignore", "*.log", "--ignore", "node_modules/", "v1.0.0"},
 			wantErr: false,
 			wantConfig: Config{
-				FromCommit: "v1.0.0",
-				ToCommit:   "HEAD",
+				FromCommit:     "v1.0.0",
+				ToCommit:       "HEAD",
 				IgnorePatterns: []string{"*.log", "node_modules/"},
+			},
+		},
+		{
+			name:    "comma-separated ignore patterns",
+			args:    []string{"--ignore", "*.log, *.tmp, node_modules/", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit:     "v1.0.0",
+				ToCommit:       "HEAD",
+				IgnorePatterns: []string{"*.log", "*.tmp", "node_modules/"},
 			},
 		},
 	}

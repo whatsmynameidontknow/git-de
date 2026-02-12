@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/pflag"
 )
@@ -28,7 +29,7 @@ func Parse(args []string) (*Config, error) {
 	pflag.BoolVarP(&config.Overwrite, "overwrite", "w", false, "Overwrite existing output directory")
 	pflag.BoolVarP(&config.Concurrent, "concurrent", "c", false, "Copy files concurrently")
 	pflag.BoolVarP(&config.Verbose, "verbose", "v", false, "Enable verbose output")
-	pflag.StringArrayVarP(&config.IgnorePatterns, "ignore", "i", nil, "Ignore patterns (can be used multiple times)")
+	pflag.StringArrayVarP(&config.IgnorePatterns, "ignore", "i", nil, "Ignore patterns (comma-separated or multiple flags)")
 
 	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Usage: git-de [options] <from-commit> [<to-commit>]
@@ -46,7 +47,7 @@ Options:
   -w, --overwrite         Overwrite existing output directory
   -c, --concurrent        Copy files concurrently
   -v, --verbose           Enable verbose output
-  -i, --ignore string     Ignore patterns (can be used multiple times)
+  -i, --ignore string     Ignore patterns (comma-separated or multiple flags)
   -h, --help              Show this help message
 
 Examples:
@@ -87,6 +88,18 @@ Examples:
 	} else {
 		config.Preview = true
 	}
+
+	// Split comma-separated patterns
+	var expandedPatterns []string
+	for _, p := range config.IgnorePatterns {
+		parts := strings.Split(p, ",")
+		for _, part := range parts {
+			if trimmed := strings.TrimSpace(part); trimmed != "" {
+				expandedPatterns = append(expandedPatterns, trimmed)
+			}
+		}
+	}
+	config.IgnorePatterns = expandedPatterns
 
 	return &config, nil
 }
