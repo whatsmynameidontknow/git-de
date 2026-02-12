@@ -1,6 +1,6 @@
 # git-de
 
-Git Diff Export - A CLI tool to export files changed between Git commits.
+Git Diff Export - A CLI tool to export files changed between Git commits while preserving directory structure.
 
 ## Installation
 
@@ -18,7 +18,7 @@ git-de [options] <from-commit> [<to-commit>]
 
 ### Arguments
 
-- `from-commit` - Starting commit (branch, tag, or SHA) **(required)**
+- `from-commit` - Starting commit (branch, tag, or SHA) **(required unless using --tui)**
 - `to-commit` - Ending commit (defaults to `HEAD`)
 
 ### Options
@@ -30,99 +30,40 @@ git-de [options] <from-commit> [<to-commit>]
 - `-c, --concurrent` - Copy files concurrently
 - `-v, --verbose` - Enable verbose output
 - `-i, --ignore` - Ignore patterns (comma-separated or multiple flags)
-- `-I, --include` - Include patterns - only export files matching these (comma-separated or multiple flags)
+- `-I, --include` - Include patterns - only export files matching these
+- `--max-size` - Maximum file size to export (e.g., 10MB, 500KB)
+- `-a, --archive` - Export directly to archive (.zip, .tar, .tar.gz)
+- `--json` - Output results in JSON format
+- `--json-file` - Write JSON output to file
+- `--tui` - Launch interactive mode for commit and file selection
 - `-h, --help` - Show help
 
 ### Examples
 
 ```bash
-# Preview changes (no files copied)
-git-de HEAD~5 HEAD
+# Full interactive mode
+git-de --tui
 
-# Export changes to directory
-git-de HEAD~5 HEAD -o ./export
+# Export .go files only to a zip archive
+git-de HEAD~5 HEAD -I "*.go" -a export.zip
 
-# Export using flags
-git-de --from v1.0.0 --to v2.0.0 --output ./export
+# Skip large files and output a JSON report
+git-de v1.0.0 v1.1.0 -o ./out --max-size 5MB --json-file report.json
 
-# Export with concurrent copying
-git-de main develop -o ./export -c
-
-# Overwrite existing output directory
-git-de HEAD~10 HEAD -o ./export --overwrite
-
-# Only export .go files (ignore wins in conflicts)
-git-de HEAD~5 HEAD -I "*.go" -i "*_test.go" -o ./export
-
-# Include only specific directories
-git-de HEAD~5 HEAD -I "cmd/*,pkg/*" -o ./export
-
-# Verbose mode with ignore patterns
-git-de HEAD~5 HEAD -o ./export -v -i "*.log,node_modules/"
-```
-
-### Preview Mode
-
-When you don't specify an output directory (`-o`), `git-de` runs in **preview mode**:
-
-```
-=== PREVIEW MODE (no files will be copied) ===
-
-Files that would be exported (3):
-  → A: new.go
-  → M: main.go
-  → R: pkg/utils.go
-
-=== Summary ===
-new files:
-- new.go
-modified:
-- main.go
-renamed:
-- pkg/utils.go (previously pkg/helpers.go)
-```
-
-## Output
-
-When an output directory is specified:
-
-```
-export/
-├── summary.txt
-├── src/
-│   └── main.go
-└── README.md
-```
-
-### summary.txt Format
-
-```
-new files:
-- cmd/new.go
-
-modified:
-- src/main.go
-
-renamed:
-- pkg/utils.go (previously pkg/helpers.go)
-
-deleted:
-- old/file.txt
+# Concurrent export with ignore patterns
+git-de main develop -o ./export -c -i "*.log,node_modules/"
 ```
 
 ## Features
 
+- ✅ **Interactive TUI** - Select commits and files visually
+- ✅ **Archive Export** - Direct to ZIP or Tar.gz
+- ✅ **JSON Output** - Machine-readable reports
+- ✅ **Size Limits** - Prevent exporting accidental large blobs
+- ✅ **Include/Ignore Patterns** - Powerful whitelist/blacklist filtering
 - ✅ **Preview mode** - See changes without copying files
-- ✅ Copy new, modified, renamed, and copied files
-- ✅ Preserve directory structure
-- ✅ Concurrent file copying (`-c` flag)
-- ✅ Plain text summary report
-- ✅ Overwrite protection (`-w` flag)
-- ✅ Verbose mode (`-v` flag)
-- ✅ Ignore patterns (`-i` flag, comma-separated)
-- ✅ Include patterns (`-I` flag, whitelist filtering)
-- ✅ Ignores `.git` directory automatically
-- ✅ Warns about files outside repo root
+- ✅ **Concurrent copying** - High performance for large diffs
+- ✅ **Cross-platform** - Works on Linux and Windows
 
 ## Requirements
 

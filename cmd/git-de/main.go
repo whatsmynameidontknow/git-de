@@ -7,6 +7,7 @@ import (
 	"github.com/whatsmynameidontknow/git-de/internal/cli"
 	"github.com/whatsmynameidontknow/git-de/internal/exporter"
 	"github.com/whatsmynameidontknow/git-de/internal/git"
+	"github.com/whatsmynameidontknow/git-de/internal/tui"
 )
 
 func main() {
@@ -17,6 +18,14 @@ func main() {
 	}
 
 	client := git.NewClient("")
+
+	if config.TUI {
+		if err := tui.Run(client, config.FromCommit, config.ToCommit); err != nil {
+			fmt.Fprintf(os.Stderr, "TUI Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 	
 	opts := exporter.Options{
 		FromCommit:      config.FromCommit,

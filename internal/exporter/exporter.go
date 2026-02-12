@@ -113,12 +113,17 @@ func (e *Exporter) Export() error {
 		return nil
 	}
 
+	return e.ExportFiles(filesToCopy, changes, jsonFiles)
+}
+
+func (e *Exporter) ExportFiles(filesToCopy []git.FileChange, allChanges []git.FileChange, jsonFiles []JSONFile) error {
+	var err error
 	if e.opts.Preview {
-		err = e.runPreview(filesToCopy, changes)
+		err = e.runPreview(filesToCopy, allChanges)
 	} else if e.opts.ArchivePath != "" {
-		err = e.runArchiveExport(filesToCopy, changes)
+		err = e.runArchiveExport(filesToCopy, allChanges)
 	} else {
-		err = e.runExport(filesToCopy, changes)
+		err = e.runExport(filesToCopy, allChanges)
 	}
 
 	if err != nil {
@@ -126,7 +131,7 @@ func (e *Exporter) Export() error {
 	}
 
 	if e.opts.JSON {
-		return e.writeJSONReport(changes, jsonFiles)
+		return e.writeJSONReport(allChanges, jsonFiles)
 	}
 
 	return nil
@@ -250,7 +255,7 @@ func (e *Exporter) runPreview(files []git.FileChange, allChanges []git.FileChang
 }
 
 func (e *Exporter) runExport(files []git.FileChange, allChanges []git.FileChange) error {
-	if err := e.prepareOutputDir(); err != nil {
+	if err := e.PrepareOutputDir(); err != nil {
 		return err
 	}
 
@@ -433,7 +438,7 @@ func (e *Exporter) validate() error {
 	return nil
 }
 
-func (e *Exporter) prepareOutputDir() error {
+func (e *Exporter) PrepareOutputDir() error {
 	info, err := os.Stat(e.opts.OutputDir)
 	if err == nil {
 		if !info.IsDir() {
@@ -454,7 +459,7 @@ func (e *Exporter) prepareOutputDir() error {
 
 func (e *Exporter) copySequential(files []git.FileChange, total int) {
 	for i, f := range files {
-		e.copyFile(f)
+		e.CopyFile(f)
 		e.printProgress(i+1, total)
 	}
 }
@@ -468,7 +473,7 @@ func (e *Exporter) copyConcurrent(files []git.FileChange, total int) {
 		wg.Add(1)
 		go func(file git.FileChange) {
 			defer wg.Done()
-			e.copyFile(file)
+			e.CopyFile(file)
 			mu.Lock()
 			counter++
 			e.printProgress(counter, total)
@@ -478,7 +483,7 @@ func (e *Exporter) copyConcurrent(files []git.FileChange, total int) {
 	wg.Wait()
 }
 
-func (e *Exporter) copyFile(change git.FileChange) error {
+func (e *Exporter) CopyFile(change git.FileChange) error {
 	if e.client.IsFileOutsideRepo(change.Path) {
 		return nil
 	}

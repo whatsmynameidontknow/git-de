@@ -10,19 +10,21 @@ import (
 )
 
 const (
-	StatusAdded    = "A"
-	StatusModified = "M"
-	StatusDeleted  = "D"
-	StatusRenamed  = "R"
-	StatusCopied   = "C"
+	StatusAdded    FileStatus = "A"
+	StatusModified FileStatus = "M"
+	StatusDeleted  FileStatus = "D"
+	StatusRenamed  FileStatus = "R"
+	StatusCopied   FileStatus = "C"
 )
+
+type FileStatus string
 
 var (
 	ErrInvalidCommit = errors.New("invalid commit reference")
 )
 
 type FileChange struct {
-	Status  string
+	Status  FileStatus
 	Path    string
 	OldPath string
 }
@@ -112,7 +114,7 @@ func (c *Client) parseLine(line string) (FileChange, error) {
 		return FileChange{}, fmt.Errorf("invalid diff line: %s", line)
 	}
 	
-	status := string(fields[0][0])
+	status := FileStatus(fields[0][0])
 	
 	switch status {
 	case StatusRenamed, StatusCopied:

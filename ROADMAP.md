@@ -5,429 +5,57 @@
 - **v0.1.0** - Initial release with basic export functionality
 - **v0.2.0** - Preview mode (run without `-o` flag)
 - **v0.3.0** - Verbose mode, progress bar, ignore patterns
-- **v0.4.0-alpha1** - Include patterns ✓
-- **v0.4.0-alpha2** - File size limits (planned)
-- **v0.4.0-alpha3** - Archive export (planned)
-- **v0.4.0-alpha4** - JSON output (planned)
-- **v0.4.0** - TUI + all features (planned)
+- **v0.4.0** - Include patterns, file size limits, archive export, JSON output, TUI ✅ COMPLETE
 
 ---
 
-## v0.4.0 Roadmap
+## v0.4.0 Roadmap ✅ COMPLETE
 
 Staggered release with 5 features in priority order.
 
 ### Feature 1: Include Patterns ✅ COMPLETE
-
-**Priority:** 1 (highest)  
-**Release:** v0.4.0-alpha1 ✅
-
-#### Specification
-
 Add `--include` (`-I`) flag for whitelist filtering of files.
 
-**Behavior:**
-- Works similarly to `--ignore` but opposite logic
-- Only files matching include patterns are considered
-- If both `--include` and `--ignore` specified, apply include FIRST, then ignore
-- **Conflict resolution:** Ignore wins (safer)
-- Supports comma-separated patterns and multiple flags
-
-**CLI Changes:**
-```bash
-# Only export .go files
-git-de HEAD~5 -I "*.go"
-
-# Include multiple patterns
-git-de HEAD~5 -I "*.go,*.md" -I "Makefile"
-
-# Include + ignore combined (ignore wins conflicts)
-git-de HEAD~5 -I "*.go" -i "*_test.go"
-```
-
-**Implementation Notes:**
-- Add `IncludePatterns []string` to `cli.Config` and `exporter.Options`
-- In `filterAndProcess()`: check include patterns first (if any)
-- Add test cases for:
-  - Basic include pattern
-  - Multiple include patterns
-  - Comma-separated includes
-  - Include + ignore conflict (ignore wins)
-  - No include patterns (export all, current behavior)
-
-**Precedence Order:**
-```
-1. Must match --include (if any specified)
-2. Must NOT match --ignore
-3. Must NOT be deleted
-4. Must NOT be outside repo
-5. Must NOT exceed size limit (if specified)
-```
-
----
-
-### Feature 2: File Size Limit
-
-**Priority:** 3  
-**Release:** v0.4.0-alpha2
-
-#### Specification
-
+### Feature 2: File Size Limit ✅ COMPLETE
 Add `--max-size` flag to skip files exceeding size limit.
 
-**Behavior:**
-- Skip files larger than specified size
-- Show warning for skipped files
-- Support human-readable formats (10MB, 1GB, 500KB)
-- Applied after include/ignore filtering
-
-**CLI Changes:**
-```bash
-# Skip files > 10MB
-git-de HEAD~5 -o ./export --max-size 10MB
-
-# Combine with other flags
-git-de HEAD~5 -I "*.go" --max-size 5MB -v
-```
-
-**Implementation Notes:**
-- Add `MaxSize int64` to config (bytes internally)
-- Parse human-readable sizes (KB, MB, GB, TB)
-- Check file size before reading content (avoid loading large files)
-- Warning format: `⚠ Skipped (too large): filename (25MB > 10MB)`
-- Add test cases for:
-  - Size limit parsing
-  - Files under limit (exported)
-  - Files over limit (skipped with warning)
-  - Edge cases (exactly at limit, zero limit)
-
-**Size Parsing:**
-- `10` → 10 bytes
-- `10B` → 10 bytes
-- `10K` or `10KB` → 10,240 bytes
-- `10M` or `10MB` → 10,485,760 bytes
-- `1G` or `1GB` → 1,073,741,824 bytes
-
----
-
-### Feature 3: Archive Export
-
-**Priority:** 2  
-**Release:** v0.4.0-alpha3
-
-#### Specification
-
+### Feature 3: Archive Export ✅ COMPLETE
 Add `--archive` (`-a`) flag to export directly to archive file (zip/tar/tar.gz).
 
-**Behavior:**
-- Export files directly to archive without creating temp folder
-- Auto-detect format from extension (.zip, .tar, .tar.gz, .tgz)
-- Preserve directory structure inside archive
-- Summary.txt included in archive
+### Feature 4: JSON Output ✅ COMPLETE
+Add `--json` flag to output results in JSON format.
 
-**CLI Changes:**
-```bash
-# Export to zip
-git-de HEAD~5 -a export.zip
-
-# Export to tar.gz
-git-de HEAD~5 -a export.tar.gz
-
-# Combine with other flags
-git-de HEAD~5 -I "*.go" -a code.zip --max-size 5MB
-```
-
-**Implementation Notes:**
-- Add `ArchivePath string` to config
-- Mutually exclusive with `--output` (error if both provided)
-- Support formats:
-  - `.zip` → ZIP archive
-  - `.tar` → Uncompressed tar
-  - `.tar.gz`, `.tgz` → Gzipped tar
-- Stream files directly into archive (no temp files)
-- Progress bar works same as folder export
-- Add test cases for:
-  - ZIP creation
-  - Tar.gz creation
-  - Directory structure preservation
-  - Error on invalid extension
-  - Error when both --output and --archive provided
-
-**Conflict with --output:**
-```bash
-# ERROR: cannot use both
-git-de HEAD~5 -o ./export -a export.zip
-```
-
----
-
-### Feature 4: JSON Output
-
-**Priority:** 4  
-**Release:** v0.4.0-alpha4
-
-#### Specification
-
-Add `--json` flag to output results in JSON format for scripting and integration.
-
-**Behavior:**
-- If no value provided, print JSON to stdout
-- If value provided, write JSON to specified file
-- Includes metadata (commits, timestamp) and file details
-- Shows export status for each file (exported or skipped with reason)
-- Works with all other flags (include, ignore, max-size, etc.)
-
-**CLI Changes:**
-```bash
-# Print JSON to stdout
-git-de HEAD~5 HEAD --json
-
-# Write JSON to file
-git-de HEAD~5 HEAD --json export-report.json
-
-# Combine with other flags
-git-de HEAD~5 HEAD -I "*.go" --json report.json -v
-```
-
-**JSON Structure:**
-```json
-{
-  "from_commit": "abc1234",
-  "to_commit": "def5678",
-  "exported_at": "2026-02-12T23:25:00Z",
-  "summary": {
-    "total_files": 5,
-    "added": 2,
-    "modified": 2,
-    "renamed": 1,
-    "deleted": 1,
-    "skipped": {
-      "ignored": 0,
-      "too_large": 0,
-      "outside_repo": 0
-    }
-  },
-  "files": [
-    {
-      "path": "cmd/main.go",
-      "status": "A",
-      "size": 1024,
-      "exported": true
-    },
-    {
-      "path": "old/file.txt",
-      "status": "D",
-      "size": 0,
-      "exported": false,
-      "reason": "deleted"
-    }
-  ]
-}
-```
-
-**Implementation Notes:**
-- Add `JSONOutput string` to config (empty = stdout, path = file)
-- Add `JSON bool` flag to enable JSON mode
-- Create `internal/report` package for JSON generation
-- Export runs normally, but instead of text output, generate JSON
-- Add test cases for:
-  - JSON output to stdout
-  - JSON output to file
-  - JSON structure validation
-  - JSON with various skip reasons
-
----
-
-### Feature 5: TUI (Terminal User Interface)
-
-**Priority:** 5 (lowest)  
-**Release:** v0.4.0 (final)
-
-#### Specification
-
+### Feature 5: TUI (Terminal User Interface) ✅ COMPLETE
 Add `--tui` flag for interactive commit and file selection.
-
-**Behavior:**
-- Launches interactive UI when `--tui` flag provided
-- If commits provided as args, skip to file selection
-- File selection: all files start selected, user can toggle
-- Deleted files shown but disabled
-- Path input with tab completion for output directory
-- Final confirmation before export
-- In-TUI progress bar during export
-
-**CLI Changes:**
-```bash
-# Full interactive mode (select commits + files)
-git-de --tui
-
-# Pre-fill commits, skip to file selection
-git-de HEAD~5 HEAD --tui
-```
-
-**UI Flow:**
-
-**Screen 1: Commit Selection** (skip if commits provided)
-```
-┌─────────────────────────────────────────┐
-│  git-de - Select From Commit            │
-│                                         │
-│  ▸ abc1234 feat: add new feature        │
-│    def5678 fix: bug fix                 │
-│    ghi9012 docs: update readme          │
-│    [Search...]                          │
-└─────────────────────────────────────────┘
-```
-
-**Screen 2: To Commit** (if not provided)
-```
-┌─────────────────────────────────────────┐
-│  git-de - Select To Commit              │
-│                                         │
-│  ▸ HEAD (default)                       │
-│    abc1234 feat: add new feature        │
-│    [Search...]                          │
-└─────────────────────────────────────────┘
-```
-
-**Screen 3: File Selection**
-```
-┌─────────────────────────────────────────┐
-│  git-de - Select Files (5 files)        │
-│                                         │
-│  [✓] A: cmd/main.go                     │
-│  [✓] M: internal/git/client.go          │
-│  [✗] D: old/file.txt   (deleted)        │
-│  [✓] R: pkg/utils.go                    │
-│                                         │
-│  [Space:toggle] [A:all] [N:none]        │
-│  [Enter:export] [Q:cancel]              │
-└─────────────────────────────────────────┘
-```
-
-**Screen 4: Output Directory**
-```
-┌─────────────────────────────────────────┐
-│  Output Directory                       │
-│                                         │
-│  [./export                ]             │
-│  (Tab for path completion)              │
-│                                         │
-│  [Continue]  [Back]  [Cancel]           │
-└─────────────────────────────────────────┘
-```
-
-**Screen 5: Confirmation**
-```
-┌─────────────────────────────────────────┐
-│  Confirm Export                         │
-│                                         │
-│  Export 4 files to ./export?            │
-│                                         │
-│  ⚠ Warning: Directory exists and        │
-│     contains 12 files                   │
-│                                         │
-│  [Yes, overwrite]  [No, go back]        │
-└─────────────────────────────────────────┘
-```
-
-**Output Directory Behavior:**
-- Directory does NOT need to exist beforehand - it will be created
-- If directory exists with files: show warning in confirmation screen
-- If directory exists but empty: no warning
-- If directory doesn't exist: create automatically
-- User confirms overwrite in final step
-
-**Screen 6: Progress**
-```
-┌─────────────────────────────────────────┐
-│  Exporting...                           │
-│                                         │
-│  [████████████░░░░░░░░] 60%  3/5 files  │
-│                                         │
-│  Current: internal/git/client.go        │
-└─────────────────────────────────────────┘
-```
-
-**Implementation Notes:**
-- Use `github.com/charmbracelet/bubbletea` for TUI framework
-- Add `TUI bool` to config
-- If TUI mode:
-  - Skip normal CLI validation
-  - Launch bubbletea program
-  - Collect all inputs interactively
-  - Run export with progress updates
-- Keyboard shortcuts:
-  - `Space` - toggle file selection
-  - `A` - select all
-  - `N` - select none
-  - `Enter` - proceed/confirm
-  - `Q` - cancel/quit
-  - `Tab` - path completion
-  - Arrow keys - navigate
-- Add test cases for:
-  - TUI flag parsing
-  - Mock TUI interactions (if possible)
-  - Integration with existing export logic
-
-**No Args Behavior:**
-- Current behavior preserved: show help if no args
-- TUI requires explicit `--tui` flag
-- Example: `git-de` → show help (not TUI)
 
 ---
 
 ## Technical Considerations
 
 ### Dependencies
-
-**For TUI:**
 - `github.com/charmbracelet/bubbletea` - TUI framework
 - `github.com/charmbracelet/lipgloss` - Styling
-- `github.com/charmbracelet/bubbles` - UI components (list, textinput, progress)
-
-**For Archive:**
-- Standard library `archive/zip` and `archive/tar`
-- `compress/gzip` for .tar.gz support
+- `github.com/charmbracelet/bubbles` - UI components
 
 ### Testing Strategy
-
-Each feature requires:
-1. CLI flag parsing tests
-2. Exporter logic tests
-3. Integration tests (if applicable)
-4. TDD approach: tests first, then implementation
-
-### Release Schedule
-
-| Version | Feature | ETA |
-|---------|---------|-----|
-| v0.4.0-alpha1 | Include patterns | TBD |
-| v0.4.0-alpha2 | File size limit | TBD |
-| v0.4.0-alpha3 | Archive export | TBD |
-| v0.4.0-alpha4 | JSON output | TBD |
-| v0.4.0 | TUI + all features | TBD |
+- CLI flag parsing tests: ✅ Pass
+- Exporter logic tests: ✅ Pass
+- Git logic tests: ✅ Pass
+- Build check: ✅ Pass
 
 ### Documentation Updates
-
-Each release requires:
-- Update README.md with new flags
-- Update examples section
-- Add to CHANGELOG
-
----
-
-## Open Questions
-
-1. ~~Should config file support be added?~~ (No - decided)
-2. ~~Should shell completions be included?~~ (No - decided)
-3. ~~JSON output format?~~ (Yes - planned as Feature 4)
-4. ~~Git hooks integration?~~ (No - decided)
-5. ~~CSV output format?~~ (No - decided)
+- Update README.md: ✅ Done
 
 ---
 
 ## Completed Features Archive
+
+### v0.4.0 Features
+- ✅ **Include patterns** (`-I` flag)
+- ✅ **File size limit** (`--max-size` flag)
+- ✅ **Archive export** (`-a` flag)
+- ✅ **JSON output** (`--json` flag)
+- ✅ **Interactive TUI** (`--tui` flag)
 
 ### v0.3.0 Features
 - ✅ Verbose mode (`-v`)

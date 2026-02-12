@@ -24,6 +24,7 @@ type Config struct {
 	ArchivePath     string
 	JSON            bool
 	JSONFile        string
+	TUI             bool
 }
 
 func Parse(args []string) (*Config, error) {
@@ -42,6 +43,7 @@ func Parse(args []string) (*Config, error) {
 	pflag.StringVarP(&config.ArchivePath, "archive", "a", "", "Export to archive file (.zip, .tar, .tar.gz, .tgz)")
 	pflag.BoolVar(&config.JSON, "json", false, "Output results in JSON format")
 	pflag.StringVar(&config.JSONFile, "json-file", "", "Write JSON output to file (implies --json)")
+	pflag.BoolVar(&config.TUI, "tui", false, "Interactive mode for commit and file selection")
 
 	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Usage: git-de [options] <from-commit> [<to-commit>]
@@ -88,12 +90,18 @@ Examples:
 	}
 
 	if config.FromCommit == "" {
-		pflag.Usage()
-		return nil, fmt.Errorf("from-commit is required")
+		if config.TUI {
+			// TUI mode: commits will be selected interactively
+		} else {
+			pflag.Usage()
+			return nil, fmt.Errorf("from-commit is required")
+		}
 	}
 
 	if config.ToCommit == "" {
-		config.ToCommit = "HEAD"
+		if !config.TUI || config.FromCommit != "" {
+			config.ToCommit = "HEAD"
+		}
 	}
 
 	if config.OutputDir != "" {
