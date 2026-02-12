@@ -247,6 +247,34 @@ func TestParse(t *testing.T) {
 				JSONFile:   "report.json",
 			},
 		},
+		{
+			name:    "tui flag",
+			args:    []string{"--tui", "v1.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit: "v1.0.0",
+				ToCommit:   "HEAD",
+				TUI:        true,
+			},
+		},
+		{
+			name:    "tui with commits prefilled",
+			args:    []string{"--tui", "v1.0.0", "v2.0.0"},
+			wantErr: false,
+			wantConfig: Config{
+				FromCommit: "v1.0.0",
+				ToCommit:   "v2.0.0",
+				TUI:        true,
+			},
+		},
+		{
+			name:    "tui without commits",
+			args:    []string{"--tui"},
+			wantErr: false,
+			wantConfig: Config{
+				TUI: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -286,6 +314,9 @@ func TestParse(t *testing.T) {
 			}
 			if config.JSONFile != tt.wantConfig.JSONFile {
 				t.Errorf("JSONFile = %v, want %v", config.JSONFile, tt.wantConfig.JSONFile)
+			}
+			if config.TUI != tt.wantConfig.TUI {
+				t.Errorf("TUI = %v, want %v", config.TUI, tt.wantConfig.TUI)
 			}
 		})
 	}
