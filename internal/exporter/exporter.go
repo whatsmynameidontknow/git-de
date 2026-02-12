@@ -4,15 +4,49 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/whatsmynameidontknow/git-de/internal/git"
 	"github.com/whatsmynameidontknow/git-de/internal/manifest"
 )
+
+type JSONReport struct {
+	FromCommit string       `json:"from_commit"`
+	ToCommit   string       `json:"to_commit"`
+	ExportedAt string       `json:"exported_at"`
+	Summary    JSONSummary  `json:"summary"`
+	Files      []JSONFile   `json:"files"`
+}
+
+type JSONSummary struct {
+	TotalFiles int         `json:"total_files"`
+	Added      int         `json:"added"`
+	Modified   int         `json:"modified"`
+	Renamed    int         `json:"renamed"`
+	Copied     int         `json:"copied"`
+	Deleted    int         `json:"deleted"`
+	Skipped    JSONSkipped `json:"skipped"`
+}
+
+type JSONSkipped struct {
+	Ignored    int `json:"ignored"`
+	TooLarge   int `json:"too_large"`
+	OutsideRepo int `json:"outside_repo"`
+}
+
+type JSONFile struct {
+	Path     string `json:"path"`
+	Status   string `json:"status"`
+	Exported bool   `json:"exported"`
+	Reason   string `json:"reason,omitempty"`
+	OldPath  string `json:"old_path,omitempty"`
+}
 
 type GitClient interface {
 	GetChangedFiles(from, to string) ([]git.FileChange, error)
@@ -35,6 +69,8 @@ type Options struct {
 	IncludePatterns []string
 	MaxSize         int64
 	ArchivePath     string
+	JSON            bool
+	JSONFile        string
 }
 
 type Exporter struct {
@@ -61,38 +97,68 @@ func (e *Exporter) Export() error {
 
 	if len(changes) == 0 {
 		fmt.Println("No changes found.")
+		if e.opts.JSON {
+			return e.writeJSONReport(changes, nil)
+		}
 		return nil
 	}
 
-	filesToCopy := e.filterAndProcess(changes)
+	filesToCopy, jsonFiles := e.filterAndProcess(changes)
 
 	if len(filesToCopy) == 0 {
 		fmt.Println("No files to export after filtering.")
+		if e.opts.JSON {
+			return e.writeJSONReport(changes, jsonFiles)
+		}
 		return nil
 	}
 
 	if e.opts.Preview {
-		return e.runPreview(filesToCopy, changes)
+		err = e.runPreview(filesToCopy, changes)
+	} else if e.opts.ArchivePath != "" {
+		err = e.runArchiveExport(filesToCopy, changes)
+	} else {
+		err = e.runExport(filesToCopy, changes)
 	}
 
-	if e.opts.ArchivePath != "" {
-		return e.runArchiveExport(filesToCopy, changes)
+	if err != nil {
+		return err
 	}
 
-	return e.runExport(filesToCopy, changes)
+	if e.opts.JSON {
+		return e.writeJSONReport(changes, jsonFiles)
+	}
+
+	return nil
 }
 
-func (e *Exporter) filterAndProcess(changes []git.FileChange) []git.FileChange {
+func (e *Exporter) filterAndProcess(changes []git.FileChange) ([]git.FileChange, []JSONFile) {
 	var result []git.FileChange
+	var jsonFiles []JSONFile
+
 	for _, c := range changes {
+		jf := JSONFile{
+			Path:   c.Path,
+			Status: string(c.Status),
+		}
+		if c.OldPath != "" {
+			jf.OldPath = c.OldPath
+		}
+
 		// Skip deleted files
 		if c.Status == git.StatusDeleted {
 			fmt.Printf("⚠ Deleted: %s\n", c.Path)
+			jf.Exported = false
+			jf.Reason = "deleted"
+			jsonFiles = append(jsonFiles, jf)
 			continue
 		}
 
 		// Check if should copy
 		if !c.ShouldCopy() {
+			jf.Exported = false
+			jf.Reason = "not copyable"
+			jsonFiles = append(jsonFiles, jf)
 			continue
 		}
 
@@ -102,6 +168,9 @@ func (e *Exporter) filterAndProcess(changes []git.FileChange) []git.FileChange {
 				if e.opts.Verbose {
 					fmt.Printf("⊘ Not included: %s\n", c.Path)
 				}
+				jf.Exported = false
+				jf.Reason = "not included"
+				jsonFiles = append(jsonFiles, jf)
 				continue
 			}
 		}
@@ -111,12 +180,18 @@ func (e *Exporter) filterAndProcess(changes []git.FileChange) []git.FileChange {
 			if e.opts.Verbose {
 				fmt.Printf("⊘ Ignored: %s\n", c.Path)
 			}
+			jf.Exported = false
+			jf.Reason = "ignored"
+			jsonFiles = append(jsonFiles, jf)
 			continue
 		}
 
 		// Check if outside repo
 		if e.client.IsFileOutsideRepo(c.Path) {
 			fmt.Printf("⚠ Outside repo: %s\n", c.Path)
+			jf.Exported = false
+			jf.Reason = "outside repo"
+			jsonFiles = append(jsonFiles, jf)
 			continue
 		}
 
@@ -125,13 +200,18 @@ func (e *Exporter) filterAndProcess(changes []git.FileChange) []git.FileChange {
 			content, err := e.client.GetFileContent(e.opts.ToCommit, c.Path)
 			if err == nil && int64(len(content)) > e.opts.MaxSize {
 				fmt.Printf("⚠ Skipped (too large): %s (%s > %s)\n", c.Path, formatSize(int64(len(content))), formatSize(e.opts.MaxSize))
+				jf.Exported = false
+				jf.Reason = "too large"
+				jsonFiles = append(jsonFiles, jf)
 				continue
 			}
 		}
 
+		jf.Exported = true
+		jsonFiles = append(jsonFiles, jf)
 		result = append(result, c)
 	}
-	return result
+	return result, jsonFiles
 }
 
 func (e *Exporter) shouldIgnore(path string) bool {
@@ -442,4 +522,60 @@ func formatSize(bytes int64) string {
 	default:
 		return fmt.Sprintf("%dB", bytes)
 	}
+}
+
+func (e *Exporter) writeJSONReport(allChanges []git.FileChange, jsonFiles []JSONFile) error {
+	var summary JSONSummary
+	summary.TotalFiles = len(allChanges)
+
+	for _, c := range allChanges {
+		switch c.Status {
+		case git.StatusAdded:
+			summary.Added++
+		case git.StatusModified:
+			summary.Modified++
+		case git.StatusRenamed:
+			summary.Renamed++
+		case git.StatusCopied:
+			summary.Copied++
+		case git.StatusDeleted:
+			summary.Deleted++
+		}
+	}
+
+	for _, jf := range jsonFiles {
+		if !jf.Exported {
+			switch jf.Reason {
+			case "ignored", "not included":
+				summary.Skipped.Ignored++
+			case "too large":
+				summary.Skipped.TooLarge++
+			case "outside repo":
+				summary.Skipped.OutsideRepo++
+			}
+		}
+	}
+
+	var report JSONReport
+	report.FromCommit = e.opts.FromCommit
+	report.ToCommit = e.opts.ToCommit
+	report.ExportedAt = time.Now().UTC().Format(time.RFC3339)
+	report.Summary = summary
+	report.Files = jsonFiles
+
+	data, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	if e.opts.JSONFile != "" {
+		if err := os.WriteFile(e.opts.JSONFile, data, 0644); err != nil {
+			return fmt.Errorf("failed to write JSON file: %w", err)
+		}
+		fmt.Printf("📄 JSON report written to %s\n", e.opts.JSONFile)
+	} else {
+		fmt.Println(string(data))
+	}
+
+	return nil
 }

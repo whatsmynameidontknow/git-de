@@ -22,6 +22,8 @@ type Config struct {
 	IncludePatterns []string
 	MaxSize         int64
 	ArchivePath     string
+	JSON            bool
+	JSONFile        string
 }
 
 func Parse(args []string) (*Config, error) {
@@ -38,6 +40,8 @@ func Parse(args []string) (*Config, error) {
 	pflag.StringArrayVarP(&config.IncludePatterns, "include", "I", nil, "Include patterns - only export files matching these (comma-separated or multiple flags)")
 	pflag.StringVar(&maxSizeStr, "max-size", "", "Maximum file size to export (e.g., 10MB, 500KB, 1GB)")
 	pflag.StringVarP(&config.ArchivePath, "archive", "a", "", "Export to archive file (.zip, .tar, .tar.gz, .tgz)")
+	pflag.BoolVar(&config.JSON, "json", false, "Output results in JSON format")
+	pflag.StringVar(&config.JSONFile, "json-file", "", "Write JSON output to file (implies --json)")
 
 	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Usage: git-de [options] <from-commit> [<to-commit>]
@@ -101,6 +105,11 @@ Examples:
 		config.Preview = false
 	} else {
 		config.Preview = true
+	}
+
+	// If json-file is set, enable JSON mode
+	if config.JSONFile != "" {
+		config.JSON = true
 	}
 
 	// Split comma-separated patterns for both ignore and include
