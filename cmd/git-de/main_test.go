@@ -26,10 +26,22 @@ func TestShouldUseTUI(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "positional args bypass TUI",
-			config:   &cli.Config{NoTUI: false, TUI: false, FromCommit: "HEAD~5"},
+			name:     "positional args bypass TUI only if output is set",
+			config:   &cli.Config{NoTUI: false, TUI: false, FromCommit: "HEAD~5", OutputDir: "./export"},
 			isTTY:    true,
 			expected: false,
+		},
+		{
+			name:     "positional args bypass TUI only if archive is set",
+			config:   &cli.Config{NoTUI: false, TUI: false, FromCommit: "HEAD~5", ArchivePath: "export.zip"},
+			isTTY:    true,
+			expected: false,
+		},
+		{
+			name:     "positional args launch TUI if no output/archive set",
+			config:   &cli.Config{NoTUI: false, TUI: false, FromCommit: "HEAD~5"},
+			isTTY:    true,
+			expected: true,
 		},
 		{
 			name:     "TTY auto-detects TUI mode",
@@ -51,7 +63,7 @@ func TestShouldUseTUI(t *testing.T) {
 		},
 		{
 			name:     "args override TTY detection",
-			config:   &cli.Config{NoTUI: false, TUI: false, FromCommit: "v1.0.0"},
+			config:   &cli.Config{NoTUI: false, TUI: false, FromCommit: "v1.0.0", OutputDir: "./out"},
 			isTTY:    true,
 			expected: false,
 		},

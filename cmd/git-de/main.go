@@ -76,11 +76,16 @@ func shouldUseTUIWithOverride(config *cli.Config, isTTY bool) bool {
 		return true
 	}
 
-	// If commit arguments are provided, use CLI mode
-	if config.FromCommit != "" {
+	// Auto-detect: if not in a terminal, always use CLI
+	if !isTTY {
 		return false
 	}
 
-	// Auto-detect: use TUI if stdin is a terminal
-	return isTTY
+	// If in a terminal, use CLI only if an output destination is specified
+	// (user wants to "just do it"). Otherwise, show TUI (interactive preview).
+	if config.FromCommit != "" && (config.OutputDir != "" || config.ArchivePath != "") {
+		return false
+	}
+
+	return true
 }
