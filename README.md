@@ -25,7 +25,7 @@ git-de [options] <from-commit> [<to-commit>]
 
 - `-f, --from` - Starting commit (alternative to positional arg)
 - `-t, --to` - Ending commit (defaults to HEAD)
-- `-o, --output` - Output directory (optional, runs in preview mode if not set)
+- `-o, --output` - Output directory (required for CLI mode, skips TUI)
 - `-w, --overwrite` - Overwrite existing output directory
 - `-c, --concurrent` - Copy files concurrently
 - `-v, --verbose` - Enable verbose output
@@ -33,20 +33,29 @@ git-de [options] <from-commit> [<to-commit>]
 - `-I, --include` - Include patterns - only export files matching these
 - `--max-size` - Maximum file size to export (e.g., 10MB, 500KB)
 - `-a, --archive` - Export directly to archive (.zip, .tar, .tar.gz)
-- `--tui` - Launch interactive mode for commit and file selection
+- `--no-tui` - Force CLI mode even in interactive terminal
 - `-h, --help` - Show help
 
 ### Examples
 
 ```bash
-# Full interactive mode
-git-de --tui
+# Launch TUI (default in terminal)
+git-de
+
+# Launch TUI with initial commit range
+git-de HEAD~5
+
+# CLI mode - export directly
+git-de HEAD~5 HEAD -o ./export
 
 # Export .go files only to a zip archive
 git-de HEAD~5 HEAD -I "*.go" -a export.zip
 
 # Concurrent export with ignore patterns
 git-de main develop -o ./export -c -i "*.log,node_modules/"
+
+# Force CLI mode in terminal
+git-de --no-tui HEAD~5 HEAD -o ./export
 ```
 
 ## Features
