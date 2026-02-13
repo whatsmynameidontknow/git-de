@@ -8,6 +8,7 @@ import (
 	"github.com/whatsmynameidontknow/git-de/internal/exporter"
 	"github.com/whatsmynameidontknow/git-de/internal/git"
 	"github.com/whatsmynameidontknow/git-de/internal/tui"
+	"golang.org/x/term"
 )
 
 func main() {
@@ -19,14 +20,23 @@ func main() {
 
 	client := git.NewClient("")
 
-	if config.TUI {
+	// Determine if we should use TUI mode
+	useTUI := shouldUseTUI(config)
+
+	if useTUI {
 		if err := tui.Run(client, config.FromCommit, config.ToCommit); err != nil {
 			fmt.Fprintf(os.Stderr, "TUI Error: %v\n", err)
 			os.Exit(1)
 		}
 		return
 	}
-	
+
+	// CLI mode
+	if config.FromCommit == "" {
+		fmt.Fprintf(os.Stderr, "Error: from-commit is required (or use --tui for interactive mode)\n")
+		os.Exit(1)
+	}
+
 	opts := exporter.Options{
 		FromCommit:      config.FromCommit,
 		ToCommit:        config.ToCommit,
@@ -42,9 +52,30 @@ func main() {
 	}
 
 	exp := exporter.New(client, opts)
-	
+
 	if err := exp.Export(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// shouldUseTUI determines whether to launch the TUI based on configuration and environment
+func shouldUseTUI(config *cli.Config) bool {
+	// Explicit --no-tui flag forces CLI mode
+	if config.NoTUI {
+		return false
+	}
+
+	// Explicit --tui flag forces TUI mode
+	if config.TUI {
+		return true
+	}
+
+	// If commit arguments are provided, use CLI mode
+	if config.FromCommit != "" {
+		return false
+	}
+
+	// Auto-detect: use TUI if stdin is a terminal
+	return term.IsTerminal(int(os.Stdin.Fd()))
 }

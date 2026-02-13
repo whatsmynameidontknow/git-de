@@ -5,11 +5,11 @@ Focus: Transitioning to a TUI-first interactive Git export experience.
 ## Phase 1: TUI as the Default Experience (High Priority)
 Goal: Make `git-de` launch into the TUI by default when run in a terminal.
 
-- [ ] Implement TTY detection (launch TUI only if run in a terminal).
-- [ ] Auto-bypass TUI if positional arguments (from/to) are provided.
-- [ ] Add `--no-tui` flag to explicitly use the classic CLI interface.
-- [ ] Update CLI help to reflect the new default behavior.
-- [ ] Ensure non-interactive environments (CI/CD) default to CLI.
+- [x] Implement TTY detection (launch TUI only if run in a terminal).
+- [x] Auto-bypass TUI if positional arguments (from/to) are provided.
+- [x] Add `--no-tui` flag to explicitly use the classic CLI interface.
+- [x] Update CLI help to reflect the new default behavior.
+- [x] Ensure non-interactive environments (CI/CD) default to CLI.
 
 ## Phase 2: Enhanced TUI Functionality
 Goal: Build out the feature set of the new TUI.

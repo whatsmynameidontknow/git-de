@@ -78,7 +78,7 @@ func (i limitOption) FilterValue() string { return i.label }
 
 var commitLimitOptions = []limitOption{
 	{label: "10 commits (quick review)", value: 10},
-	{label: "50 commits (default)", value: 50},
+	{label: "50 commits (standard)", value: 50},
 	{label: "100 commits (extended)", value: 100},
 	{label: "500 commits (deep history)", value: 500},
 	{label: "All commits (may be slow)", value: commitLimitAll},
