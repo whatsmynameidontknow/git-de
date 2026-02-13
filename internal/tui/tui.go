@@ -377,9 +377,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ensureFilterIdx()
 			if m.inputMode {
 				switch msg.String() {
-				case "enter", "esc":
+				case "up", "down":
 					m.inputMode = false
 					m.filterInput.Blur()
+					if len(m.filteredIdx) == 0 {
+						m.rebuildFilter()
+						m.filterInput.SetValue("")
+					}
+					return m, nil
+				case "enter":
+					m.inputMode = false
+					m.filterInput.Blur()
+					return m, nil
+				case "esc":
+					m.inputMode = false
+					m.filterInput.SetValue("")
+					m.filterInput.Blur()
+					m.rebuildFilter()
 					return m, nil
 				default:
 					m.filterInput, cmd = m.filterInput.Update(msg)
@@ -512,27 +526,34 @@ func (m Model) View() string {
 				visibleStart = visibleEnd - maxVisible
 			}
 		}
+		if len(displayIdx) > 0 {
+			for vi := visibleStart; vi < visibleEnd; vi++ {
+				f := m.files[displayIdx[vi]]
+				cursor := " "
+				if m.cursor == vi {
+					cursor = ">"
+				}
 
-		for vi := visibleStart; vi < visibleEnd; vi++ {
-			f := m.files[displayIdx[vi]]
-			cursor := " "
-			if m.cursor == vi {
-				cursor = ">"
+				line := f.Title()
+				if m.cursor == vi {
+					line = selectedStyle.Render(line)
+				}
+
+				fmt.Fprintf(&sb, "%s %s\n", cursor, line)
 			}
 
-			line := f.Title()
-			if m.cursor == vi {
-				line = selectedStyle.Render(line)
-			}
-
-			fmt.Fprintf(&sb, "%s %s\n", cursor, line)
+			fmt.Fprintf(&sb, "\n%d/%d files", len(displayIdx), len(m.files))
+		} else {
+			fmt.Fprintf(&sb, "Nothing matched (%d/%d files)", len(displayIdx), len(m.files))
 		}
-
-		fmt.Fprintf(&sb, "\n%d/%d files", len(displayIdx), len(m.files))
 		if m.filterInput.Value() != "" {
 			fmt.Fprintf(&sb, " (filter: %s)", m.filterInput.Value())
 		}
-		sb.WriteString("\n[/:filter] [Space:toggle] [A:all] [N:none] [Enter:continue] [esc:quit]\n")
+		if m.inputMode {
+			sb.WriteString("\n[enter:apply] [esc:cancel]\n")
+		} else {
+			sb.WriteString("\n[/:filter] [space:toggle] [a:all] [n:none] [enter:continue] [esc:exit]\n")
+		}
 
 	case stateOutputPath:
 		sb.WriteString("Enter Output Directory:\n\n")
