@@ -644,6 +644,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) shortHash(h string) string {
+	if len(h) > 7 {
+		return h[:7]
+	}
+	return h
+}
+
 func (m Model) View() string {
 	var sb strings.Builder
 
@@ -664,7 +671,8 @@ func (m Model) View() string {
 		sb.WriteString(m.list.View())
 
 	case stateFileSelection:
-		sb.WriteString("Select Files to Export:\n\n")
+		sb.WriteString("Select Files to Export:\n")
+		fmt.Fprintf(&sb, "Range: %s...%s\n\n", m.shortHash(m.fromCommit), m.shortHash(m.toCommit))
 
 		if m.inputMode || m.filterInput.Value() != "" {
 			sb.WriteString(m.filterInput.View() + "\n\n")

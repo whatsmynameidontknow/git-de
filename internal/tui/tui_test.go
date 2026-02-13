@@ -580,6 +580,23 @@ func TestInit_States(t *testing.T) {
 	}
 }
 
+func TestView_FileSelection_ShowsCommits(t *testing.T) {
+	m := NewModel(nil, "abc1234567", "def4567890")
+	m.state = stateFileSelection
+	m.files = []fileItem{
+		{path: "main.go", status: git.StatusAdded, selected: true},
+	}
+
+	view := m.View()
+
+	if !contains(view, "abc1234") {
+		t.Error("Expected from commit hash in view")
+	}
+	if !contains(view, "def4567") {
+		t.Error("Expected to commit hash in view")
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr)
 }
