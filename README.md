@@ -27,18 +27,20 @@ git-de [options] <from-commit> [<to-commit>]
 |------|-------------|----------|----------|
 | `-f, --from` | Starting commit (alternative to positional arg) | ✅ Used | ✅ Used |
 | `-t, --to` | Ending commit (defaults to HEAD) | ✅ Used | ✅ Used |
-| `-o, --output` | Output directory | ❌ Ignored (TUI asks interactively) | ✅ Required |
+| `-o, --output` | Output directory | ❌ Ignored (TUI asks interactively) | ✅ Required* |
 | `-w, --overwrite` | Overwrite existing output directory | ❌ Ignored | ✅ Used |
 | `-c, --concurrent` | Copy files concurrently | ❌ Ignored | ✅ Used |
 | `-v, --verbose` | Enable verbose output | ❌ Ignored | ✅ Used |
 | `-i, --ignore` | Ignore patterns (comma-separated or multiple flags) | ❌ Ignored | ✅ Used |
 | `-I, --include` | Include patterns - only export files matching these | ❌ Ignored | ✅ Used |
 | `--max-size` | Maximum file size to export (e.g., 10MB, 500KB) | ❌ Ignored | ✅ Used |
-| `-a, --archive` | Export directly to archive (.zip, .tar, .tar.gz) | ❌ Ignored | ✅ Used |
+| `-a, --archive` | Export directly to archive (.zip, .tar, .tar.gz) | ❌ Ignored (skips TUI) | ✅ Used* |
 | `--no-tui` | Force CLI mode even in interactive terminal | — | — |
 | `-h, --help` | Show help | — | — |
 
 **Legend:** ✅ = Used, ❌ = Ignored
+
+**Note:** `-o` and `-a` are mutually exclusive — use one or the other. Both skip the TUI and run in CLI mode.
 
 ### Examples
 
