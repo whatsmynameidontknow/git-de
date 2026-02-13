@@ -79,6 +79,8 @@ func (m Model) handleListItems(items []list.Item) (tea.Model, tea.Cmd) {
 	switch m.state {
 	case stateCommitLimitSelection:
 		m.list.Title = "Select Commit History Depth"
+		// Disable filtering for commit limit selection (only 6 options)
+		m.list.SetFilteringEnabled(false)
 	case stateFromCommit:
 		m.list.Title = "Select From Commit"
 	default:
