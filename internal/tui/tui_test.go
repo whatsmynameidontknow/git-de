@@ -545,47 +545,36 @@ func TestUpdate_ShortCommitHashDoesNotPanic(t *testing.T) {
 
 func TestInit_States(t *testing.T) {
 	tests := []struct {
-		name     string
-		from     string
-		to       string
-		expected string // prefix of command name or type of msg expected
+		name          string
+		from          string
+		to            string
+		expectedState sessionState
 	}{
 		{
-			name:     "no args starts with limit options",
-			from:     "",
-			to:       "",
-			expected: "limitOption",
+			name:          "no args starts with limit options",
+			from:          "",
+			to:            "",
+			expectedState: stateCommitLimitSelection,
 		},
 		{
-			name:     "from arg starts with to-commit loading",
-			from:     "abc",
-			to:       "",
-			expected: "commitItem",
+			name:          "from arg starts with to-commit selection screen",
+			from:          "abc",
+			to:            "",
+			expectedState: stateToCommit,
 		},
 		{
-			name:     "both args starts with file loading",
-			from:     "abc",
-			to:       "def",
-			expected: "fileItem",
+			name:          "both args starts with file selection screen",
+			from:          "abc",
+			to:            "def",
+			expectedState: stateFileSelection,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := NewModel(nil, tt.from, tt.to)
-			// Mock git client would be better but let's just check the state and Init for now
-			if tt.from != "" && tt.to != "" {
-				if m.state != stateFileSelection {
-					t.Errorf("Expected stateFileSelection, got %d", m.state)
-				}
-			} else if tt.from != "" {
-				if m.state != stateToCommit {
-					t.Errorf("Expected stateToCommit, got %d", m.state)
-				}
-			} else {
-				if m.state != stateCommitLimitSelection {
-					t.Errorf("Expected stateCommitLimitSelection, got %d", m.state)
-				}
+			if m.state != tt.expectedState {
+				t.Errorf("Expected state %d, got %d", tt.expectedState, m.state)
 			}
 		})
 	}
