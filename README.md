@@ -33,8 +33,6 @@ git-de [options] <from-commit> [<to-commit>]
 - `-I, --include` - Include patterns - only export files matching these
 - `--max-size` - Maximum file size to export (e.g., 10MB, 500KB)
 - `-a, --archive` - Export directly to archive (.zip, .tar, .tar.gz)
-- `--json` - Output results in JSON format
-- `--json-file` - Write JSON output to file
 - `--tui` - Launch interactive mode for commit and file selection
 - `-h, --help` - Show help
 
@@ -47,9 +45,6 @@ git-de --tui
 # Export .go files only to a zip archive
 git-de HEAD~5 HEAD -I "*.go" -a export.zip
 
-# Skip large files and output a JSON report
-git-de v1.0.0 v1.1.0 -o ./out --max-size 5MB --json-file report.json
-
 # Concurrent export with ignore patterns
 git-de main develop -o ./export -c -i "*.log,node_modules/"
 ```
@@ -58,7 +53,6 @@ git-de main develop -o ./export -c -i "*.log,node_modules/"
 
 - ✅ **Interactive TUI** - Select commits and files visually
 - ✅ **Archive Export** - Direct to ZIP or Tar.gz
-- ✅ **JSON Output** - Machine-readable reports
 - ✅ **Size Limits** - Prevent exporting accidental large blobs
 - ✅ **Include/Ignore Patterns** - Powerful whitelist/blacklist filtering
 - ✅ **Preview mode** - See changes without copying files
