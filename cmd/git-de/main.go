@@ -20,6 +20,12 @@ func main() {
 
 	client := git.NewClient("")
 
+	// Check if we're in a git repository
+	if !client.IsGitRepository() {
+		fmt.Fprintf(os.Stderr, "Error: not a git repository\n")
+		os.Exit(1)
+	}
+
 	// Determine if we should use TUI mode
 	useTUI := shouldUseTUI(config)
 
