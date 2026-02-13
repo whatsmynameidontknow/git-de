@@ -19,9 +19,7 @@ const (
 
 type FileStatus string
 
-var (
-	ErrInvalidCommit = errors.New("invalid commit reference")
-)
+var ErrInvalidCommit = errors.New("invalid commit reference")
 
 type FileChange struct {
 	Status  FileStatus
@@ -79,32 +77,32 @@ func (c *Client) ValidateCommit(commit string) error {
 func (c *Client) GetChangedFiles(fromCommit, toCommit string) ([]FileChange, error) {
 	cmd := exec.Command("git", "diff", "--name-status", "-M", "-C", fromCommit, toCommit)
 	cmd.Dir = c.workDir
-	
+
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("git diff failed: %w", err)
 	}
-	
+
 	return c.parseDiffOutput(string(output))
 }
 
 func (c *Client) parseDiffOutput(output string) ([]FileChange, error) {
 	var changes []FileChange
 	scanner := bufio.NewScanner(strings.NewReader(output))
-	
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" || strings.Contains(line, ".git/") {
 			continue
 		}
-		
+
 		change, err := c.parseLine(line)
 		if err != nil {
 			return nil, err
 		}
 		changes = append(changes, change)
 	}
-	
+
 	return changes, scanner.Err()
 }
 
@@ -113,9 +111,9 @@ func (c *Client) parseLine(line string) (FileChange, error) {
 	if len(fields) < 2 {
 		return FileChange{}, fmt.Errorf("invalid diff line: %s", line)
 	}
-	
+
 	status := FileStatus(fields[0][0])
-	
+
 	switch status {
 	case StatusRenamed, StatusCopied:
 		if len(fields) < 3 {
@@ -153,10 +151,8 @@ func (c *Client) IsFileOutsideRepo(path string) bool {
 		return true
 	}
 	cleanPath := filepath.Clean(path)
-	if strings.HasPrefix(cleanPath, "../") {
-		return true
-	}
-	return false
+
+	return strings.HasPrefix(cleanPath, "../")
 }
 
 func (c *Client) GetRecentCommits(n int) ([]Commit, error) {
@@ -170,12 +166,12 @@ func (c *Client) GetCommitsAfter(after string, n int) ([]Commit, error) {
 func (c *Client) getCommits(name string, args ...string) ([]Commit, error) {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = c.workDir
-	
+
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("git log failed: %w", err)
 	}
-	
+
 	var commits []Commit
 	scanner := bufio.NewScanner(strings.NewReader(string(output)))
 	for scanner.Scan() {
@@ -188,6 +184,6 @@ func (c *Client) getCommits(name string, args ...string) ([]Commit, error) {
 			commits = append(commits, commit)
 		}
 	}
-	
+
 	return commits, scanner.Err()
 }

@@ -11,11 +11,14 @@ import (
 
 func TestNewModel_NoCommits(t *testing.T) {
 	m := NewModel(nil, "", "")
-	if m.state != stateFromCommit {
-		t.Errorf("Expected state stateFromCommit, got %d", m.state)
+	if m.state != stateCommitLimitSelection {
+		t.Errorf("Expected state stateCommitLimitSelection, got %d", m.state)
 	}
 	if m.fromCommit != "" {
 		t.Errorf("Expected empty fromCommit, got %s", m.fromCommit)
+	}
+	if m.commitLimit != defaultCommitLimit {
+		t.Errorf("Expected commitLimit %d, got %d", defaultCommitLimit, m.commitLimit)
 	}
 }
 
@@ -39,6 +42,23 @@ func TestNewModel_WithBothCommits(t *testing.T) {
 	}
 	if m.toCommit != "def456" {
 		t.Errorf("Expected toCommit def456, got %s", m.toCommit)
+	}
+}
+
+func TestUpdate_EarlyKeyPressDoesNotPanic(t *testing.T) {
+	m := NewModel(nil, "", "")
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Update panicked on early key press: %v", r)
+		}
+	}()
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	model := updated.(Model)
+
+	if model.state != stateCommitLimitSelection {
+		t.Errorf("Expected state stateCommitLimitSelection, got %d", model.state)
 	}
 }
 
@@ -218,6 +238,7 @@ func TestUpdate_Confirm_BackGoesToOutputPath(t *testing.T) {
 
 func TestUpdate_CommitsLoaded(t *testing.T) {
 	m := NewModel(nil, "", "")
+	m.state = stateFromCommit
 
 	items := []list.Item{
 		commitItem{sha: "abc1234567890", message: "first commit"},
@@ -229,6 +250,21 @@ func TestUpdate_CommitsLoaded(t *testing.T) {
 
 	if model.list.Title != "Select From Commit" {
 		t.Errorf("Expected list title 'Select From Commit', got %s", model.list.Title)
+	}
+}
+
+func TestUpdate_LimitOptionsLoaded(t *testing.T) {
+	m := NewModel(nil, "", "")
+
+	items := []list.Item{
+		limitOption{label: "50 commits (default)", value: 50},
+	}
+
+	updated, _ := m.Update(items)
+	model := updated.(Model)
+
+	if model.list.Title != "Select Commit History Depth" {
+		t.Errorf("Expected list title 'Select Commit History Depth', got %s", model.list.Title)
 	}
 }
 
@@ -368,6 +404,128 @@ func TestCommitItem_Title(t *testing.T) {
 	}
 	if !contains(title, "feat: add feature") {
 		t.Errorf("Expected message in title, got %s", title)
+	}
+}
+
+func TestValidateCommitLimit(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    int
+		wantErr bool
+	}{
+		{name: "valid number", input: "50", want: 50},
+		{name: "minimum", input: "1", want: 1},
+		{name: "maximum", input: "999999", want: 999999},
+		{name: "with spaces", input: "  100  ", want: 100},
+		{name: "zero", input: "0", wantErr: true},
+		{name: "negative", input: "-5", wantErr: true},
+		{name: "too large", input: "1000000", wantErr: true},
+		{name: "not a number", input: "abc", wantErr: true},
+		{name: "empty", input: "", wantErr: true},
+		{name: "decimal", input: "3.14", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := validateCommitLimit(tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("Expected error for input %q, got nil", tt.input)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error for input %q: %v", tt.input, err)
+				}
+				if got != tt.want {
+					t.Errorf("Expected %d, got %d", tt.want, got)
+				}
+			}
+		})
+	}
+}
+
+func TestUpdate_LimitSelection_Predefined(t *testing.T) {
+	m := NewModel(nil, "", "")
+
+	// Load limit options into the list
+	var items []list.Item
+	for _, opt := range commitLimitOptions {
+		items = append(items, opt)
+	}
+	updated, _ := m.Update(items)
+	model := updated.(Model)
+
+	// Select the first item (10 commits) by pressing enter
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+
+	if model.state != stateFromCommit {
+		t.Errorf("Expected state stateFromCommit, got %d", model.state)
+	}
+	if model.commitLimit != 10 {
+		t.Errorf("Expected commitLimit 10, got %d", model.commitLimit)
+	}
+	if cmd == nil {
+		t.Error("Expected loadCommitsCmd to be returned")
+	}
+}
+
+func TestUpdate_LimitSelection_Custom(t *testing.T) {
+	m := NewModel(nil, "", "")
+
+	// Load limit options into the list
+	var items []list.Item
+	for _, opt := range commitLimitOptions {
+		items = append(items, opt)
+	}
+	updated, _ := m.Update(items)
+	model := updated.(Model)
+
+	// Navigate to Custom... (last item, index 5)
+	for i := 0; i < 5; i++ {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+		model = updated.(Model)
+	}
+
+	// Select Custom...
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+
+	if model.state != stateCommitLimitCustom {
+		t.Errorf("Expected state stateCommitLimitCustom, got %d", model.state)
+	}
+}
+
+func TestUpdate_LimitCustom_EscapeGoesBack(t *testing.T) {
+	m := NewModel(nil, "", "")
+	m.state = stateCommitLimitCustom
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	if model.state != stateCommitLimitSelection {
+		t.Errorf("Expected state stateCommitLimitSelection, got %d", model.state)
+	}
+	if model.err != nil {
+		t.Errorf("Expected err to be cleared, got %v", model.err)
+	}
+}
+
+func TestView_LimitCustom(t *testing.T) {
+	m := NewModel(nil, "", "")
+	m.state = stateCommitLimitCustom
+
+	view := m.View()
+
+	if !contains(view, "Enter Custom Commit Limit") {
+		t.Error("Expected 'Enter Custom Commit Limit' in view")
+	}
+	if !contains(view, "1 and 999999") {
+		t.Error("Expected range hint in view")
+	}
+	if !contains(view, "[esc:back]") {
+		t.Error("Expected escape hint in view")
 	}
 }
 

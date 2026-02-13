@@ -35,28 +35,28 @@ func Generate(changes []git.FileChange) string {
 	if len(newFiles) > 0 {
 		sb.WriteString("new files:\n")
 		for _, f := range newFiles {
-			sb.WriteString(fmt.Sprintf("- %s\n", f))
+			fmt.Fprintf(&sb, "- %s\n", f)
 		}
 	}
 
 	if len(modified) > 0 {
 		sb.WriteString("modified:\n")
 		for _, f := range modified {
-			sb.WriteString(fmt.Sprintf("- %s\n", f))
+			fmt.Fprintf(&sb, "- %s\n", f)
 		}
 	}
 
 	if len(renamed) > 0 {
 		sb.WriteString("renamed:\n")
 		for _, f := range renamed {
-			sb.WriteString(fmt.Sprintf("- %s\n", f))
+			fmt.Fprintf(&sb, "- %s\n", f)
 		}
 	}
 
 	if len(deleted) > 0 {
 		sb.WriteString("deleted:\n")
 		for _, f := range deleted {
-			sb.WriteString(fmt.Sprintf("- %s\n", f))
+			fmt.Fprintf(&sb, "- %s\n", f)
 		}
 	}
 
@@ -64,5 +64,5 @@ func Generate(changes []git.FileChange) string {
 }
 
 func WriteToFile(path string, content string) error {
-	return os.WriteFile(path, []byte(content), 0644)
+	return os.WriteFile(path, []byte(content), 0o644)
 }

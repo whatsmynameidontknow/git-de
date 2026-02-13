@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -20,7 +21,9 @@ import (
 type sessionState int
 
 const (
-	stateFromCommit sessionState = iota
+	stateCommitLimitSelection sessionState = iota
+	stateCommitLimitCustom
+	stateFromCommit
 	stateToCommit
 	stateFileSelection
 	stateOutputPath
@@ -30,7 +33,9 @@ const (
 )
 
 const (
-	defaultOutputPath = "./export"
+	defaultOutputPath  = "./export"
+	defaultCommitLimit = 50
+	commitLimitAll     = 999999
 )
 
 var (
@@ -58,9 +63,27 @@ type commitItem struct {
 	message string
 }
 
-func (i commitItem) Title() string       { return i.sha[:7] + " " + i.message }
+func (i commitItem) Title() string       { return i.message }
 func (i commitItem) Description() string { return i.sha }
-func (i commitItem) FilterValue() string { return i.sha + " " + i.message }
+func (i commitItem) FilterValue() string { return i.message }
+
+type limitOption struct {
+	label string
+	value int // -1 for custom
+}
+
+func (i limitOption) Title() string       { return i.label }
+func (i limitOption) Description() string { return "" }
+func (i limitOption) FilterValue() string { return i.label }
+
+var commitLimitOptions = []limitOption{
+	{label: "10 commits (quick review)", value: 10},
+	{label: "50 commits (default)", value: 50},
+	{label: "100 commits (extended)", value: 100},
+	{label: "500 commits (deep history)", value: 500},
+	{label: "All commits (may be slow)", value: commitLimitAll},
+	{label: "Custom...", value: -1},
+}
 
 type fileItem struct {
 	path     string
@@ -99,37 +122,49 @@ type progressMsg struct {
 	total   int
 }
 
-type Model struct {
-	state     sessionState
-	gitClient *git.Client
-	err       error
-
-	// Inputs
-	fromCommit string
-	toCommit   string
-	outputPath string
-
-	// Components
-	list     list.Model
-	input    textinput.Model
-	progress progress.Model
-
-	// Data
-	files       []fileItem
-	filteredIdx []int // indices into files for current filter
-	cursor      int
-	inputMode   bool
-	filterInput textinput.Model
-
-	// Window size
-	width  int
-	height int
-
-	// Progress tracking
-	totalFiles  int
-	doneFiles   int
-	currentFile string
+type exportStartedMsg struct {
+	ch <-chan progressMsg
 }
+
+type (
+	exportDoneMsg struct{}
+	Model         struct {
+		state     sessionState
+		gitClient *git.Client
+		err       error
+
+		// Inputs
+		fromCommit string
+		toCommit   string
+		outputPath string
+
+		// Commit limit
+		commitLimit int
+		limitInput  textinput.Model
+
+		// Components
+		list     list.Model
+		input    textinput.Model
+		progress progress.Model
+
+		// Data
+		files       []fileItem
+		filteredIdx []int // indices into files for current filter
+		cursor      int
+		inputMode   bool
+		filterInput textinput.Model
+
+		// Window size
+		width  int
+		height int
+
+		// Progress tracking
+		totalFiles  int
+		doneFiles   int
+		currentFile string
+		progressCh  <-chan progressMsg
+	}
+)
 
 func NewModel(client *git.Client, from, to string) Model {
 	ti := textinput.New()
@@ -137,19 +172,29 @@ func NewModel(client *git.Client, from, to string) Model {
 	ti.SetValue(defaultOutputPath)
 	ti.Focus()
 
+	commitList := list.New([]list.Item{}, list.NewDefaultDelegate(), 60, 20)
+	commitList.KeyMap.Quit = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "quit"))
+
 	fi := textinput.New()
 	fi.Placeholder = "type to filter..."
 	fi.Prompt = "/ "
+
+	li := textinput.New()
+	li.Placeholder = "Enter number of commits (1-999999)"
+	li.CharLimit = 6
 
 	prog := progress.New(progress.WithDefaultGradient())
 
 	m := Model{
 		gitClient:   client,
+		list:        commitList,
 		input:       ti,
 		filterInput: fi,
+		limitInput:  li,
 		progress:    prog,
 		fromCommit:  from,
 		toCommit:    to,
+		commitLimit: defaultCommitLimit,
 	}
 
 	if from != "" && to != "" {
@@ -157,7 +202,7 @@ func NewModel(client *git.Client, from, to string) Model {
 	} else if from != "" {
 		m.state = stateToCommit
 	} else {
-		m.state = stateFromCommit
+		m.state = stateCommitLimitSelection
 	}
 
 	return m
@@ -170,12 +215,37 @@ func Run(client *git.Client, from, to string) error {
 	return err
 }
 
+func validateCommitLimit(input string) (int, error) {
+	n, err := strconv.Atoi(strings.TrimSpace(input))
+	if err != nil {
+		return 0, fmt.Errorf("invalid number")
+	}
+	if n < 1 {
+		return 0, fmt.Errorf("must be at least 1")
+	}
+	if n > commitLimitAll {
+		return 0, fmt.Errorf("maximum is %d", commitLimitAll)
+	}
+	return n, nil
+}
+
 func (m Model) Init() tea.Cmd {
+	if m.state == stateCommitLimitSelection {
+		return m.loadLimitOptionsCmd
+	}
 	return m.loadCommitsCmd
 }
 
+func (m Model) loadLimitOptionsCmd() tea.Msg {
+	var items []list.Item
+	for _, opt := range commitLimitOptions {
+		items = append(items, opt)
+	}
+	return items
+}
+
 func (m Model) loadCommitsCmd() tea.Msg {
-	commits, err := m.gitClient.GetRecentCommits(50)
+	commits, err := m.gitClient.GetRecentCommits(m.commitLimit)
 	if err != nil {
 		return err
 	}
@@ -187,7 +257,7 @@ func (m Model) loadCommitsCmd() tea.Msg {
 }
 
 func (m Model) loadToCommitsCmd() tea.Msg {
-	commits, err := m.gitClient.GetCommitsAfter(m.fromCommit, 50)
+	commits, err := m.gitClient.GetCommitsAfter(m.fromCommit, m.commitLimit)
 	if err != nil {
 		return err
 	}
@@ -243,26 +313,34 @@ func (m Model) startExport() tea.Cmd {
 		}
 
 		total := len(selectedFiles)
-		for _, f := range selectedFiles {
-			// Update UI
-			// Note: This is simplified. tea.Cmd should usually return a single message.
-			// But since we are in a closure, we can't easily send multiple updates
-			// without a channel or similar.
-			// For TUI, it's better to use a channel or just do it in chunks.
-			// However, for this implementation, we'll just do it synchronously
-			// and return the final message, or use a workaround.
+		progressChan := make(chan progressMsg)
+		go func() {
+			for i, f := range selectedFiles {
+				_ = exp.CopyFile(f)
+				progressChan <- progressMsg{
+					current: i + 1,
+					total:   total,
+					file:    f.Path,
+				}
+			}
+			close(progressChan)
+		}()
 
-			_ = exp.CopyFile(f)
-			// (Progress update would go here if we used a more complex setup)
-		}
-
-		// Add summary.txt
-		// We'd need all changes for a proper summary, but for now:
 		summary := manifest.Generate(selectedFiles)
 		summaryPath := filepath.Join(m.outputPath, "summary.txt")
 		_ = manifest.WriteToFile(summaryPath, summary)
 
-		return progressMsg{current: total, total: total, file: "Done"}
+		return exportStartedMsg{ch: progressChan}
+	}
+}
+
+func waitForProgress(ch <-chan progressMsg) tea.Cmd {
+	return func() tea.Msg {
+		msg, ok := <-ch
+		if !ok {
+			return exportDoneMsg{}
+		}
+		return msg
 	}
 }
 
@@ -304,7 +382,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list = list.New(msg, list.NewDefaultDelegate(), w, h)
 		m.list.KeyMap.Quit = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "quit"))
 
-		if m.state == stateFromCommit {
+		if m.state == stateCommitLimitSelection {
+			m.list.Title = "Select Commit History Depth"
+		} else if m.state == stateFromCommit {
 			m.list.Title = "Select From Commit"
 		} else {
 			m.list.Title = "Select To Commit (after " + m.fromCommit[:7] + ")"
@@ -321,13 +401,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 		return m, nil
 
+	case exportStartedMsg:
+		m.progressCh = msg.ch
+		return m, waitForProgress(msg.ch)
+
 	case progressMsg:
 		m.doneFiles = msg.current
 		m.totalFiles = msg.total
 		m.currentFile = msg.file
-		m.progress.SetPercent(1.0)
+
+		percent := 1.0
+		if msg.total > 0 {
+			percent = float64(msg.current) / float64(msg.total)
+		}
+
+		if msg.total > 0 && msg.current >= msg.total {
+			m.state = stateDone
+			return m, m.progress.SetPercent(1)
+		}
+
+		return m, tea.Batch(
+			m.progress.SetPercent(percent),
+			waitForProgress(m.progressCh),
+		)
+
+	case exportDoneMsg:
 		m.state = stateDone
 		return m, nil
+
+	case progress.FrameMsg:
+		var progressCmd tea.Cmd
+		updatedProgress, progressCmd := m.progress.Update(msg)
+		m.progress = updatedProgress.(progress.Model)
+		return m, progressCmd
 
 	case error:
 		m.err = msg
@@ -336,7 +442,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		// Forward non-key messages (e.g. FilterMatchesMsg, spinner ticks) to the list
 		// so filtering actually works.
-		if m.state == stateFromCommit || m.state == stateToCommit {
+		if m.state == stateCommitLimitSelection || m.state == stateFromCommit || m.state == stateToCommit {
 			m.list, cmd = m.list.Update(msg)
 			return m, cmd
 		}
@@ -352,6 +458,48 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch m.state {
+		case stateCommitLimitSelection:
+			if msg.String() == "enter" && !m.list.SettingFilter() {
+				if item := m.list.SelectedItem(); item != nil {
+					opt := item.(limitOption)
+					if opt.value == -1 {
+						m.state = stateCommitLimitCustom
+						m.limitInput.Focus()
+						m.limitInput.SetValue("")
+						return m, nil
+					}
+					m.commitLimit = opt.value
+					m.state = stateFromCommit
+					return m, m.loadCommitsCmd
+				}
+			}
+			m.list, cmd = m.list.Update(msg)
+			return m, cmd
+
+		case stateCommitLimitCustom:
+			switch msg.String() {
+			case "enter":
+				if m.limitInput.Value() != "" {
+					limit, err := validateCommitLimit(m.limitInput.Value())
+					if err != nil {
+						m.err = err
+						return m, nil
+					}
+					m.commitLimit = limit
+					m.err = nil
+					m.state = stateFromCommit
+					return m, m.loadCommitsCmd
+				}
+			case "esc":
+				m.state = stateCommitLimitSelection
+				m.err = nil
+				return m, nil
+			default:
+				m.limitInput, cmd = m.limitInput.Update(msg)
+				return m, cmd
+			}
+			return m, nil
+
 		case stateFromCommit:
 			if msg.String() == "enter" && !m.list.SettingFilter() {
 				if item := m.list.SelectedItem(); item != nil {
@@ -492,6 +640,16 @@ func (m Model) View() string {
 	sb.WriteString(titleStyle.Render("Git Diff Export") + "\n\n")
 
 	switch m.state {
+	case stateCommitLimitSelection:
+		sb.WriteString(m.list.View())
+
+	case stateCommitLimitCustom:
+		sb.WriteString("Enter Custom Commit Limit:\n\n")
+		sb.WriteString(m.limitInput.View())
+		sb.WriteString("\n\n")
+		sb.WriteString(statusStyle.Render("Enter a number between 1 and 999999"))
+		sb.WriteString("\n[Enter:confirm] [esc:back]\n")
+
 	case stateFromCommit, stateToCommit:
 		sb.WriteString(m.list.View())
 
