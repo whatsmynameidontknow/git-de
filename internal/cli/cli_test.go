@@ -59,15 +59,19 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit: "v1.0.0",
-				ToCommit:   "HEAD",
+				ToCommit:   "",
 				Overwrite:  false,
 				Concurrent: true,
 			},
 		},
 		{
-			name:    "missing from-commit",
+			name:    "missing from-commit is allowed at parse stage",
 			args:    []string{},
-			wantErr: true,
+			wantErr: false,
+			wantConfig: Config{
+				ToCommit: "",
+				Preview:  true,
+			},
 		},
 		{
 			name:    "verbose flag",
@@ -75,7 +79,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit: "v1.0.0",
-				ToCommit:   "HEAD",
+				ToCommit:   "",
 				Verbose:    true,
 			},
 		},
@@ -85,7 +89,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit:     "v1.0.0",
-				ToCommit:       "HEAD",
+				ToCommit:       "",
 				IgnorePatterns: []string{"*.log", "node_modules/"},
 			},
 		},
@@ -95,7 +99,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit:     "v1.0.0",
-				ToCommit:       "HEAD",
+				ToCommit:       "",
 				IgnorePatterns: []string{"*.log", "*.tmp", "node_modules/"},
 			},
 		},
@@ -104,8 +108,8 @@ func TestParse(t *testing.T) {
 			args:    []string{"--include", "*.go", "v1.0.0"},
 			wantErr: false,
 			wantConfig: Config{
-				FromCommit:     "v1.0.0",
-				ToCommit:       "HEAD",
+				FromCommit:      "v1.0.0",
+				ToCommit:        "",
 				IncludePatterns: []string{"*.go"},
 			},
 		},
@@ -115,7 +119,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit:      "v1.0.0",
-				ToCommit:        "HEAD",
+				ToCommit:        "",
 				IncludePatterns: []string{"*.go", "*.md"},
 			},
 		},
@@ -125,7 +129,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit:      "v1.0.0",
-				ToCommit:        "HEAD",
+				ToCommit:        "",
 				IncludePatterns: []string{"*.go", "*.md", "Makefile"},
 			},
 		},
@@ -135,7 +139,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit:      "v1.0.0",
-				ToCommit:        "HEAD",
+				ToCommit:        "",
 				IncludePatterns: []string{"*.go"},
 				IgnorePatterns:  []string{"*_test.go"},
 			},
@@ -146,7 +150,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit: "v1.0.0",
-				ToCommit:   "HEAD",
+				ToCommit:   "",
 				MaxSize:    10 * 1024 * 1024,
 			},
 		},
@@ -156,7 +160,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit: "v1.0.0",
-				ToCommit:   "HEAD",
+				ToCommit:   "",
 				MaxSize:    500 * 1024,
 			},
 		},
@@ -166,7 +170,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit: "v1.0.0",
-				ToCommit:   "HEAD",
+				ToCommit:   "",
 				MaxSize:    1024 * 1024 * 1024,
 			},
 		},
@@ -176,7 +180,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit: "v1.0.0",
-				ToCommit:   "HEAD",
+				ToCommit:   "",
 				MaxSize:    1024,
 			},
 		},
@@ -186,7 +190,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit: "v1.0.0",
-				ToCommit:   "HEAD",
+				ToCommit:   "",
 				MaxSize:    10 * 1024 * 1024,
 			},
 		},
@@ -201,7 +205,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit:  "v1.0.0",
-				ToCommit:    "HEAD",
+				ToCommit:    "",
 				ArchivePath: "export.zip",
 			},
 		},
@@ -211,7 +215,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit:  "v1.0.0",
-				ToCommit:    "HEAD",
+				ToCommit:    "",
 				ArchivePath: "export.tar.gz",
 			},
 		},
@@ -241,7 +245,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit: "v1.0.0",
-				ToCommit:   "HEAD",
+				ToCommit:   "",
 				NoTUI:      true,
 			},
 		},
@@ -264,9 +268,14 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			name:    "no-tui without commits errors",
+			name:    "no-tui without commits is allowed at parse stage",
 			args:    []string{"--no-tui"},
-			wantErr: true,
+			wantErr: false,
+			wantConfig: Config{
+				ToCommit: "",
+				NoTUI:    true,
+				Preview:  true,
+			},
 		},
 	}
 
@@ -303,10 +312,10 @@ func TestParse(t *testing.T) {
 				t.Errorf("ArchivePath = %v, want %v", config.ArchivePath, tt.wantConfig.ArchivePath)
 			}
 			if config.TUI != tt.wantConfig.TUI {
-		if config.NoTUI != tt.wantConfig.NoTUI {
-			t.Errorf("NoTUI = %v, want %v", config.NoTUI, tt.wantConfig.NoTUI)
-		}
 				t.Errorf("TUI = %v, want %v", config.TUI, tt.wantConfig.TUI)
+			}
+			if config.NoTUI != tt.wantConfig.NoTUI {
+				t.Errorf("NoTUI = %v, want %v", config.NoTUI, tt.wantConfig.NoTUI)
 			}
 		})
 	}

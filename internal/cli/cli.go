@@ -104,9 +104,8 @@ Examples:
 	}
 
 	if config.ToCommit == "" {
-		if !config.TUI {
-			config.ToCommit = "HEAD"
-		}
+		// No default here. Defaulting is handled by main.go (for CLI)
+		// or TUI (for interactive selection).
 	}
 
 	if config.OutputDir != "" {

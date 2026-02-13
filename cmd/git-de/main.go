@@ -37,6 +37,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if config.ToCommit == "" {
+		config.ToCommit = "HEAD"
+	}
+
 	opts := exporter.Options{
 		FromCommit:      config.FromCommit,
 		ToCommit:        config.ToCommit,
