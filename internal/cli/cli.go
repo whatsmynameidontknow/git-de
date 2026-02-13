@@ -22,8 +22,6 @@ type Config struct {
 	IncludePatterns []string
 	MaxSize         int64
 	ArchivePath     string
-	JSON            bool
-	JSONFile        string
 	TUI             bool
 }
 
@@ -41,8 +39,6 @@ func Parse(args []string) (*Config, error) {
 	pflag.StringArrayVarP(&config.IncludePatterns, "include", "I", nil, "Include patterns - only export files matching these (comma-separated or multiple flags)")
 	pflag.StringVar(&maxSizeStr, "max-size", "", "Maximum file size to export (e.g., 10MB, 500KB, 1GB)")
 	pflag.StringVarP(&config.ArchivePath, "archive", "a", "", "Export to archive file (.zip, .tar, .tar.gz, .tgz)")
-	pflag.BoolVar(&config.JSON, "json", false, "Output results in JSON format")
-	pflag.StringVar(&config.JSONFile, "json-file", "", "Write JSON output to file (implies --json)")
 	pflag.BoolVar(&config.TUI, "tui", false, "Interactive mode for commit and file selection")
 
 	pflag.Usage = func() {
@@ -113,11 +109,6 @@ Examples:
 		config.Preview = false
 	} else {
 		config.Preview = true
-	}
-
-	// If json-file is set, enable JSON mode
-	if config.JSONFile != "" {
-		config.JSON = true
 	}
 
 	// Split comma-separated patterns for both ignore and include

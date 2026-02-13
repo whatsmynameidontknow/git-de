@@ -39,8 +39,6 @@ func main() {
 		IncludePatterns: config.IncludePatterns,
 		MaxSize:         config.MaxSize,
 		ArchivePath:     config.ArchivePath,
-		JSON:            config.JSON,
-		JSONFile:        config.JSONFile,
 	}
 
 	exp := exporter.New(client, opts)
