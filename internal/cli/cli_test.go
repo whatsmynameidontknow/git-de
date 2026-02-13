@@ -231,7 +231,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 			wantConfig: Config{
 				FromCommit: "v1.0.0",
-				ToCommit:   "HEAD",
+				ToCommit:   "",
 				TUI:        true,
 			},
 		},

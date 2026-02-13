@@ -230,10 +230,16 @@ func validateCommitLimit(input string) (int, error) {
 }
 
 func (m Model) Init() tea.Cmd {
-	if m.state == stateCommitLimitSelection {
+	switch m.state {
+	case stateCommitLimitSelection:
 		return m.loadLimitOptionsCmd
+	case stateToCommit:
+		return m.loadToCommitsCmd
+	case stateFileSelection:
+		return m.loadFilesCmd
+	default:
+		return m.loadCommitsCmd
 	}
-	return m.loadCommitsCmd
 }
 
 func (m Model) loadLimitOptionsCmd() tea.Msg {

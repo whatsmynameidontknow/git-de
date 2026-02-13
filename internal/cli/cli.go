@@ -104,7 +104,7 @@ Examples:
 	}
 
 	if config.ToCommit == "" {
-		if !config.TUI || config.FromCommit != "" {
+		if !config.TUI {
 			config.ToCommit = "HEAD"
 		}
 	}

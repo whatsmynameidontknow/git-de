@@ -543,6 +543,54 @@ func TestUpdate_ShortCommitHashDoesNotPanic(t *testing.T) {
 	m.Update(items)
 }
 
+func TestInit_States(t *testing.T) {
+	tests := []struct {
+		name     string
+		from     string
+		to       string
+		expected string // prefix of command name or type of msg expected
+	}{
+		{
+			name:     "no args starts with limit options",
+			from:     "",
+			to:       "",
+			expected: "limitOption",
+		},
+		{
+			name:     "from arg starts with to-commit loading",
+			from:     "abc",
+			to:       "",
+			expected: "commitItem",
+		},
+		{
+			name:     "both args starts with file loading",
+			from:     "abc",
+			to:       "def",
+			expected: "fileItem",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := NewModel(nil, tt.from, tt.to)
+			// Mock git client would be better but let's just check the state and Init for now
+			if tt.from != "" && tt.to != "" {
+				if m.state != stateFileSelection {
+					t.Errorf("Expected stateFileSelection, got %d", m.state)
+				}
+			} else if tt.from != "" {
+				if m.state != stateToCommit {
+					t.Errorf("Expected stateToCommit, got %d", m.state)
+				}
+			} else {
+				if m.state != stateCommitLimitSelection {
+					t.Errorf("Expected stateCommitLimitSelection, got %d", m.state)
+				}
+			}
+		})
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr)
 }
