@@ -37,8 +37,11 @@ type Model struct {
 	files       []fileItem
 	filteredIdx []int // indices into files for current filter
 	cursor      int
-	inputMode   bool
+	inputMode   bool // for file filter
 	filterInput textinput.Model
+
+	// Output path input focus
+	outputInputFocused bool
 
 	// Window size
 	width  int

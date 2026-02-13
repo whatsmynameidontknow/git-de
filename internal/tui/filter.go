@@ -24,3 +24,8 @@ func (m *Model) rebuildFilter() {
 		m.cursor = max(0, len(m.filteredIdx)-1)
 	}
 }
+
+func (m *Model) clearFilter() {
+	m.filterInput.SetValue("")
+	m.rebuildFilter()
+}

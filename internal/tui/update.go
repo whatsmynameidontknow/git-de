@@ -83,8 +83,24 @@ func (m Model) handleListItems(items []list.Item) (tea.Model, tea.Cmd) {
 		m.list.SetFilteringEnabled(false)
 	case stateFromCommit:
 		m.list.Title = "Select From Commit"
+		// Add backspace key help to go back to commit limit selection
+		backspaceBinding := key.NewBinding(key.WithKeys("backspace"), key.WithHelp("backspace", "back"))
+		m.list.AdditionalShortHelpKeys = func() []key.Binding {
+			return []key.Binding{backspaceBinding}
+		}
+		m.list.AdditionalFullHelpKeys = func() []key.Binding {
+			return []key.Binding{backspaceBinding}
+		}
 	default:
 		m.list.Title = "Select To Commit (after " + m.shortHash(m.fromCommit) + ")"
+		// Add backspace key help for To commit screen
+		backspaceBinding := key.NewBinding(key.WithKeys("backspace"), key.WithHelp("backspace", "back"))
+		m.list.AdditionalShortHelpKeys = func() []key.Binding {
+			return []key.Binding{backspaceBinding}
+		}
+		m.list.AdditionalFullHelpKeys = func() []key.Binding {
+			return []key.Binding{backspaceBinding}
+		}
 	}
 	return m, nil
 }
@@ -204,6 +220,10 @@ func (m Model) handleKeyFromCommit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.loadToCommitsCmd
 		}
 	}
+	if msg.String() == "backspace" && !m.list.SettingFilter() {
+		m.state = stateCommitLimitSelection
+		return m, m.loadLimitOptionsCmd
+	}
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
 	return m, cmd
@@ -215,6 +235,10 @@ func (m Model) handleKeyToCommit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.toCommit = item.(commitItem).sha
 			return m, m.loadFilesCmd
 		}
+	}
+	if msg.String() == "backspace" && !m.list.SettingFilter() {
+		m.state = stateFromCommit
+		return m, m.loadCommitsCmd
 	}
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
@@ -259,11 +283,15 @@ func (m Model) handleKeyFileSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.files[idx].selected = false
 		}
 	case "backspace":
-		if m.filterInput.Value() != "" {
-			m.filterInput.SetValue("")
-			m.rebuildFilter()
-		}
+		m.clearFilter()
+		m.state = stateToCommit
+		return m, m.loadToCommitsCmd
+	case "c", "C":
+		m.clearFilter()
 	case "enter":
+		m.clearFilter()
+		m.outputInputFocused = true
+		m.input.Focus()
 		m.state = stateOutputPath
 		return m, nil
 	case "esc":
@@ -302,20 +330,55 @@ func (m Model) handleKeyFileFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyOutputPath(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-	m.input, cmd = m.input.Update(msg)
-	switch msg.String() {
-	case "enter":
-		m.outputPath = m.input.Value()
-		if m.outputPath == "" {
-			m.outputPath = defaultOutputPath
+	if m.outputInputFocused {
+		// Input is focused - handle editing
+		switch msg.String() {
+		case "esc":
+			// Blur input
+			m.outputInputFocused = false
+			m.input.Blur()
+			return m, nil
+		case "enter":
+			// Confirm and proceed
+			m.outputPath = m.input.Value()
+			if m.outputPath == "" {
+				m.outputPath = defaultOutputPath
+			}
+			m.state = stateConfirm
+			return m, nil
+		default:
+			// Pass to input for editing
+			var cmd tea.Cmd
+			m.input, cmd = m.input.Update(msg)
+			return m, cmd
 		}
-		m.state = stateConfirm
-		return m, nil
+	}
+
+	// Input is blurred - navigation mode
+	switch msg.String() {
 	case "esc":
 		return m, tea.Quit
+	case "backspace":
+		// Go back to file selection
+		m.state = stateFileSelection
+		return m, nil
+	case "enter", " ":
+		// Focus input
+		m.outputInputFocused = true
+		m.input.Focus()
+		return m, nil
+	default:
+		// Any printable key - focus input and insert character
+		if msg.Type == tea.KeyRunes {
+			m.outputInputFocused = true
+			m.input.Focus()
+			var cmd tea.Cmd
+			m.input, cmd = m.input.Update(msg)
+			return m, cmd
+		}
 	}
-	return m, cmd
+
+	return m, nil
 }
 
 func (m Model) handleKeyConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -325,6 +388,8 @@ func (m Model) handleKeyConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if strings.ToLower(msg.String()) == "n" || msg.String() == "backspace" {
 		m.state = stateOutputPath
+		m.outputInputFocused = true
+		m.input.Focus()
 		return m, nil
 	}
 	if msg.String() == "esc" {

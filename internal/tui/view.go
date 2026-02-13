@@ -114,7 +114,7 @@ func (m Model) viewFileSelection(sb *strings.Builder) {
 	if m.inputMode {
 		sb.WriteString("\n[enter:apply] [esc:cancel]\n")
 	} else {
-		sb.WriteString("\n[/:filter] [space:toggle] [a:all] [n:none] [enter:continue] [esc:exit]\n")
+		sb.WriteString("\n[/:filter] [space:toggle] [a:all] [n:none] [c:clear filter] [backspace:back] [enter:continue] [esc:exit]\n")
 	}
 }
 
@@ -148,7 +148,11 @@ func (m Model) viewFileStatusLine(sb *strings.Builder, displayIdx []int) {
 func (m Model) viewOutputPath(sb *strings.Builder) {
 	sb.WriteString("Enter Output Directory:\n\n")
 	sb.WriteString(m.input.View())
-	sb.WriteString("\n\n[Enter:confirm] [esc:quit]\n")
+	if m.outputInputFocused {
+		sb.WriteString("\n\n[enter:confirm] [esc:blur]\n")
+	} else {
+		sb.WriteString("\n\n[any key:focus] [backspace:back] [esc:quit]\n")
+	}
 }
 
 func (m Model) viewConfirm(sb *strings.Builder) {
@@ -158,7 +162,7 @@ func (m Model) viewConfirm(sb *strings.Builder) {
 		sb.WriteString(errorStyle.Render("⚠ Warning: Directory exists and will be overwritten!") + "\n\n")
 	}
 
-	sb.WriteString("[Y:confirm] [N:back] [esc:quit]\n")
+	sb.WriteString("[Y:confirm] [N/backspace:back] [esc:quit]\n")
 }
 
 func (m Model) viewProgress(sb *strings.Builder) {
