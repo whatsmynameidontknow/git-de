@@ -597,6 +597,22 @@ func TestView_FileSelection_ShowsCommits(t *testing.T) {
 	}
 }
 
+func TestView_FileSelection_ShowsSelectedCount(t *testing.T) {
+	m := NewModel(nil, "abc", "def")
+	m.state = stateFileSelection
+	m.files = []fileItem{
+		{path: "main.go", status: git.StatusAdded, selected: true},
+		{path: "utils.go", status: git.StatusModified, selected: true},
+		{path: "old.go", status: git.StatusDeleted, selected: false, disabled: true},
+	}
+
+	view := m.View()
+
+	if !contains(view, "2 selected") {
+		t.Error("Expected '2 selected' in view")
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr)
 }

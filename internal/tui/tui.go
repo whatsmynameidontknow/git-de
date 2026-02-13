@@ -721,6 +721,15 @@ func (m Model) View() string {
 		if m.filterInput.Value() != "" {
 			fmt.Fprintf(&sb, " (filter: %s)", m.filterInput.Value())
 		}
+		if !m.inputMode {
+			selectedCount := 0
+			for _, f := range m.files {
+				if f.selected && !f.disabled {
+					selectedCount++
+				}
+			}
+			fmt.Fprintf(&sb, " | %d selected", selectedCount)
+		}
 		if m.inputMode {
 			sb.WriteString("\n[enter:apply] [esc:cancel]\n")
 		} else {
