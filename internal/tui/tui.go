@@ -713,23 +713,41 @@ func (m Model) View() string {
 
 				fmt.Fprintf(&sb, "%s %s\n", cursor, line)
 			}
-
-			fmt.Fprintf(&sb, "\n%d/%d files", len(displayIdx), len(m.files))
+		}
+		// Build status line based on mode and filter state
+		filteredFiles := len(displayIdx)
+		totalFiles := len(m.files)
+		filteredOut := totalFiles - filteredFiles
+		filterText := m.filterInput.Value()
+		hasFilter := filterText != ""
+		
+		if m.inputMode {
+			// Input mode: show items without selected count
+			if filteredFiles == 0 {
+				fmt.Fprintf(&sb, "none matched (%d filtered)", filteredOut)
+			} else if hasFilter {
+				fmt.Fprintf(&sb, "%d items (%d filtered)", filteredFiles, filteredOut)
+			} else {
+				fmt.Fprintf(&sb, "%d items", filteredFiles)
+			}
 		} else {
-			fmt.Fprintf(&sb, "Nothing matched (%d/%d files)", len(displayIdx), len(m.files))
-		}
-		if m.filterInput.Value() != "" {
-			fmt.Fprintf(&sb, " (filter: %s)", m.filterInput.Value())
-		}
-		if !m.inputMode {
+			// Not in input mode: show items with selected count
 			selectedCount := 0
 			for _, f := range m.files {
 				if f.selected && !f.disabled {
 					selectedCount++
 				}
 			}
-			fmt.Fprintf(&sb, " | %d selected", selectedCount)
+			
+			if filteredFiles == 0 {
+				fmt.Fprintf(&sb, "none matched (%d filtered) | %d selected", filteredOut, selectedCount)
+			} else if hasFilter {
+				fmt.Fprintf(&sb, "%d items (%d filtered) | %d selected", filteredFiles, filteredOut, selectedCount)
+			} else {
+				fmt.Fprintf(&sb, "%d items | %d selected", filteredFiles, selectedCount)
+			}
 		}
+		
 		if m.inputMode {
 			sb.WriteString("\n[enter:apply] [esc:cancel]\n")
 		} else {
