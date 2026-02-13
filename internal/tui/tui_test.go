@@ -317,7 +317,7 @@ func TestView_FileSelection(t *testing.T) {
 	if !contains(view, "old.go") {
 		t.Error("Expected 'old.go' in view")
 	}
-	if !contains(view, "[Space:toggle]") {
+	if !contains(view, "[space:toggle]") {
 		t.Error("Expected keyboard shortcuts in view")
 	}
 }
@@ -399,11 +399,8 @@ func TestCommitItem_Title(t *testing.T) {
 	item := commitItem{sha: "abc1234567890abcdef", message: "feat: add feature"}
 	title := item.Title()
 
-	if !contains(title, "abc1234") {
-		t.Errorf("Expected short SHA in title, got %s", title)
-	}
-	if !contains(title, "feat: add feature") {
-		t.Errorf("Expected message in title, got %s", title)
+	if title != "feat: add feature" {
+		t.Errorf("Expected title to be message only, got %s", title)
 	}
 }
 
