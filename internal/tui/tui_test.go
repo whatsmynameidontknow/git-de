@@ -526,6 +526,23 @@ func TestView_LimitCustom(t *testing.T) {
 	}
 }
 
+func TestUpdate_ShortCommitHashDoesNotPanic(t *testing.T) {
+	// Create a model with a short commit hash (length < 7)
+	m := NewModel(nil, "HEAD~5", "")
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Update panicked on short commit hash: %v", r)
+		}
+	}()
+
+	// Send list items to trigger the title update in Model.Update
+	items := []list.Item{
+		commitItem{sha: "abc123456", message: "commit"},
+	}
+	m.Update(items)
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr)
 }

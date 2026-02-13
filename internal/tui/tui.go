@@ -387,7 +387,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else if m.state == stateFromCommit {
 			m.list.Title = "Select From Commit"
 		} else {
-			m.list.Title = "Select To Commit (after " + m.fromCommit[:7] + ")"
+			displayHash := m.fromCommit
+			if len(displayHash) > 7 {
+				displayHash = displayHash[:7]
+			}
+			m.list.Title = "Select To Commit (after " + displayHash + ")"
 		}
 		return m, nil
 
