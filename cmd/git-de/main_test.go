@@ -1,0 +1,68 @@
+package main
+
+import (
+	"testing"
+
+	"github.com/whatsmynameidontknow/git-de/internal/cli"
+)
+
+func TestShouldUseTUI(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   *cli.Config
+		isTTY    bool
+		expected bool
+	}{
+		{
+			name:     "explicit --no-tui forces CLI mode",
+			config:   &cli.Config{NoTUI: true, TUI: false, FromCommit: ""},
+			isTTY:    true,
+			expected: false,
+		},
+		{
+			name:     "explicit --tui forces TUI mode",
+			config:   &cli.Config{NoTUI: false, TUI: true, FromCommit: ""},
+			isTTY:    false,
+			expected: true,
+		},
+		{
+			name:     "positional args bypass TUI",
+			config:   &cli.Config{NoTUI: false, TUI: false, FromCommit: "HEAD~5"},
+			isTTY:    true,
+			expected: false,
+		},
+		{
+			name:     "TTY auto-detects TUI mode",
+			config:   &cli.Config{NoTUI: false, TUI: false, FromCommit: ""},
+			isTTY:    true,
+			expected: true,
+		},
+		{
+			name:     "non-TTY defaults to CLI",
+			config:   &cli.Config{NoTUI: false, TUI: false, FromCommit: ""},
+			isTTY:    false,
+			expected: false,
+		},
+		{
+			name:     "--no-tui overrides --tui",
+			config:   &cli.Config{NoTUI: true, TUI: true, FromCommit: ""},
+			isTTY:    true,
+			expected: false,
+		},
+		{
+			name:     "args override TTY detection",
+			config:   &cli.Config{NoTUI: false, TUI: false, FromCommit: "v1.0.0"},
+			isTTY:    true,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := shouldUseTUIWithOverride(tt.config, tt.isTTY)
+			if result != tt.expected {
+				t.Errorf("shouldUseTUIWithOverride() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}

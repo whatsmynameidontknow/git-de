@@ -61,6 +61,11 @@ func main() {
 
 // shouldUseTUI determines whether to launch the TUI based on configuration and environment
 func shouldUseTUI(config *cli.Config) bool {
+	return shouldUseTUIWithOverride(config, term.IsTerminal(int(os.Stdin.Fd())))
+}
+
+// shouldUseTUIWithOverride is the testable version that accepts an explicit TTY flag
+func shouldUseTUIWithOverride(config *cli.Config, isTTY bool) bool {
 	// Explicit --no-tui flag forces CLI mode
 	if config.NoTUI {
 		return false
@@ -77,5 +82,5 @@ func shouldUseTUI(config *cli.Config) bool {
 	}
 
 	// Auto-detect: use TUI if stdin is a terminal
-	return term.IsTerminal(int(os.Stdin.Fd()))
+	return isTTY
 }
