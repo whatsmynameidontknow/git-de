@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/whatsmynameidontknow/git-de/internal/validation"
 )
 
 // Update handles all Bubble Tea messages.
@@ -344,6 +345,12 @@ func (m Model) handleKeyOutputPath(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.outputPath == "" {
 				m.outputPath = defaultOutputPath
 			}
+			// Validate path
+			if err := validation.ValidatePath(m.outputPath); err != nil {
+				m.err = err
+				return m, nil
+			}
+			m.err = nil
 			m.state = stateConfirm
 			return m, nil
 		default:

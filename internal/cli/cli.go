@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
+	"github.com/whatsmynameidontknow/git-de/internal/validation"
 )
 
 type Config struct {
@@ -102,6 +103,10 @@ Examples:
 	}
 
 	if config.OutputDir != "" {
+		// Validate path
+		if err := validation.ValidatePath(config.OutputDir); err != nil {
+			return nil, fmt.Errorf("invalid output directory: %w", err)
+		}
 		absPath, err := filepath.Abs(config.OutputDir)
 		if err != nil {
 			return nil, fmt.Errorf("invalid output directory: %w", err)
@@ -148,6 +153,10 @@ Examples:
 	if config.ArchivePath != "" {
 		if config.OutputDir != "" {
 			return nil, fmt.Errorf("cannot use both --output and --archive")
+		}
+		// Validate path
+		if err := validation.ValidatePath(config.ArchivePath); err != nil {
+			return nil, fmt.Errorf("invalid archive path: %w", err)
 		}
 		ext := strings.ToLower(config.ArchivePath)
 		validExt := strings.HasSuffix(ext, ".zip") ||
