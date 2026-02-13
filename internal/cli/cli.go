@@ -22,7 +22,6 @@ type Config struct {
 	IncludePatterns []string
 	MaxSize         int64
 	ArchivePath     string
-	TUI             bool
 	NoTUI           bool
 }
 
@@ -40,7 +39,6 @@ func Parse(args []string) (*Config, error) {
 	pflag.StringArrayVarP(&config.IncludePatterns, "include", "I", nil, "Include patterns - only export files matching these (comma-separated or multiple flags)")
 	pflag.StringVar(&maxSizeStr, "max-size", "", "Maximum file size to export (e.g., 10MB, 500KB, 1GB)")
 	pflag.StringVarP(&config.ArchivePath, "archive", "a", "", "Export to archive file (.zip, .tar, .tar.gz, .tgz)")
-	pflag.BoolVar(&config.TUI, "tui", false, "Launch interactive TUI (auto-detected in terminals)")
 	pflag.BoolVar(&config.NoTUI, "no-tui", false, "Force CLI mode even in terminal")
 
 	pflag.Usage = func() {
@@ -49,7 +47,7 @@ func Parse(args []string) (*Config, error) {
 Export files changed between Git commits.
 
 By default, git-de launches an interactive TUI when run in a terminal.
-Use --no-tui to force CLI mode, or provide commit arguments to skip the TUI.
+Use --no-tui to force CLI mode, or provide commit arguments with an output destination to skip the TUI.
 
 Arguments:
   from-commit    Starting commit (optional in TUI mode)
@@ -66,14 +64,14 @@ Options:
   -I, --include string    Include patterns - only export files matching these (comma-separated or multiple flags)
       --max-size string   Maximum file size to export (e.g., 10MB, 500KB, 1GB)
   -a, --archive string    Export to archive file (.zip, .tar, .tar.gz, .tgz)
-      --tui               Force TUI mode (normally auto-detected)
       --no-tui            Force CLI mode even in terminal
   -h, --help              Show this help message
 
 Examples:
   git-de                          # Launch TUI (in terminal)
-  git-de --no-tui HEAD~5 -o ./export   # CLI mode with explicit flag
-  git-de HEAD~5 HEAD -o ./export       # CLI mode with positional args
+  git-de HEAD~5                   # Interactive preview of changes
+  git-de HEAD~5 HEAD -o ./export       # CLI mode (args + output provided)
+  git-de --no-tui HEAD~5          # Force CLI mode without output (preview only)
   git-de --from v1.0.0 --to v2.0.0 --output ./export --concurrent
   git-de HEAD~5 -I "*.go" -i "*_test.go" -o ./export
   git-de HEAD~5 -o ./export --max-size 10MB
@@ -95,12 +93,7 @@ Examples:
 	}
 
 	if config.FromCommit == "" {
-		if config.TUI {
-			// TUI mode: commits will be selected interactively
-		} else {
-			pflag.Usage()
-			return nil, fmt.Errorf("from-commit is required")
-		}
+		// No validation here - handled by main.go after TTY/TUI mode selection
 	}
 
 	if config.ToCommit == "" {

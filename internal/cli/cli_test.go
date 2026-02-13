@@ -230,16 +230,6 @@ func TestParse(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "tui flag",
-			args:    []string{"--tui", "v1.0.0"},
-			wantErr: false,
-			wantConfig: Config{
-				FromCommit: "v1.0.0",
-				ToCommit:   "",
-				TUI:        true,
-			},
-		},
-		{
 			name:    "no-tui flag",
 			args:    []string{"--no-tui", "v1.0.0"},
 			wantErr: false,
@@ -247,24 +237,6 @@ func TestParse(t *testing.T) {
 				FromCommit: "v1.0.0",
 				ToCommit:   "",
 				NoTUI:      true,
-			},
-		},
-		{
-			name:    "tui with commits prefilled",
-			args:    []string{"--tui", "v1.0.0", "v2.0.0"},
-			wantErr: false,
-			wantConfig: Config{
-				FromCommit: "v1.0.0",
-				ToCommit:   "v2.0.0",
-				TUI:        true,
-			},
-		},
-		{
-			name:    "tui without commits",
-			args:    []string{"--tui"},
-			wantErr: false,
-			wantConfig: Config{
-				TUI: true,
 			},
 		},
 		{
@@ -310,9 +282,6 @@ func TestParse(t *testing.T) {
 			}
 			if config.ArchivePath != tt.wantConfig.ArchivePath {
 				t.Errorf("ArchivePath = %v, want %v", config.ArchivePath, tt.wantConfig.ArchivePath)
-			}
-			if config.TUI != tt.wantConfig.TUI {
-				t.Errorf("TUI = %v, want %v", config.TUI, tt.wantConfig.TUI)
 			}
 			if config.NoTUI != tt.wantConfig.NoTUI {
 				t.Errorf("NoTUI = %v, want %v", config.NoTUI, tt.wantConfig.NoTUI)

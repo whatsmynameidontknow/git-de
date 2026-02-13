@@ -75,11 +75,6 @@ func shouldUseTUIWithOverride(config *cli.Config, isTTY bool) bool {
 		return false
 	}
 
-	// Explicit --tui flag forces TUI mode
-	if config.TUI {
-		return true
-	}
-
 	// Auto-detect: if not in a terminal, always use CLI
 	if !isTTY {
 		return false
