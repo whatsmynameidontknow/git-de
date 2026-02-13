@@ -6,13 +6,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/whatsmynameidontknow/git-de/internal/git"
 	"github.com/whatsmynameidontknow/git-de/internal/exporter"
+	"github.com/whatsmynameidontknow/git-de/internal/git"
 	"github.com/whatsmynameidontknow/git-de/internal/manifest"
 )
 
@@ -26,6 +27,10 @@ const (
 	stateConfirm
 	stateProgress
 	stateDone
+)
+
+const (
+	defaultOutputPath = "./export"
 )
 
 var (
@@ -59,10 +64,10 @@ func (i commitItem) FilterValue() string { return i.sha + " " + i.message }
 
 type fileItem struct {
 	path     string
+	oldPath  string
 	status   git.FileStatus
 	selected bool
 	disabled bool
-	oldPath  string
 }
 
 func (i fileItem) Title() string {
@@ -72,14 +77,15 @@ func (i fileItem) Title() string {
 	} else if i.selected {
 		prefix = "[✓]"
 	}
-	
+
 	statusStr := string(i.status)
 	if i.status == git.StatusRenamed || i.status == git.StatusCopied {
 		return fmt.Sprintf("%s %s: %s (from %s)", prefix, statusStr, i.path, i.oldPath)
 	}
 	return fmt.Sprintf("%s %s: %s", prefix, statusStr, i.path)
 }
-func (i fileItem) Description() string { 
+
+func (i fileItem) Description() string {
 	if i.disabled {
 		return "(deleted - cannot export)"
 	}
@@ -88,48 +94,47 @@ func (i fileItem) Description() string {
 func (i fileItem) FilterValue() string { return i.path }
 
 type progressMsg struct {
+	file    string
 	current int
 	total   int
-	file    string
 }
 
 type Model struct {
-	state      sessionState
-	gitClient  *git.Client
-	err        error
-	
+	state     sessionState
+	gitClient *git.Client
+	err       error
+
 	// Inputs
 	fromCommit string
 	toCommit   string
 	outputPath string
-	
+
 	// Components
-	list       list.Model
-	input      textinput.Model
-	progress   progress.Model
-	
+	list     list.Model
+	input    textinput.Model
+	progress progress.Model
+
 	// Data
-	commits       []commitItem
-	files         []fileItem
-	filteredIdx   []int // indices into files for current filter
-	cursor        int
-	filterMode    bool
-	filterInput   textinput.Model
-	
+	files       []fileItem
+	filteredIdx []int // indices into files for current filter
+	cursor      int
+	inputMode   bool
+	filterInput textinput.Model
+
 	// Window size
 	width  int
 	height int
-	
+
 	// Progress tracking
-	totalFiles int
-	doneFiles  int
+	totalFiles  int
+	doneFiles   int
 	currentFile string
 }
 
 func NewModel(client *git.Client, from, to string) Model {
 	ti := textinput.New()
-	ti.Placeholder = "./export"
-	ti.SetValue("./export")
+	ti.Placeholder = defaultOutputPath
+	ti.SetValue(defaultOutputPath)
 	ti.Focus()
 
 	fi := textinput.New()
@@ -166,13 +171,7 @@ func Run(client *git.Client, from, to string) error {
 }
 
 func (m Model) Init() tea.Cmd {
-	switch m.state {
-	case stateFromCommit, stateToCommit:
-		return m.loadCommitsCmd
-	case stateFileSelection:
-		return m.loadFilesCmd
-	}
-	return nil
+	return m.loadCommitsCmd
 }
 
 func (m Model) loadCommitsCmd() tea.Msg {
@@ -237,7 +236,7 @@ func (m Model) startExport() tea.Cmd {
 			OutputDir:  m.outputPath,
 			Overwrite:  true,
 		}
-		
+
 		exp := exporter.New(m.gitClient, opts)
 		if err := exp.PrepareOutputDir(); err != nil {
 			return err
@@ -247,21 +246,21 @@ func (m Model) startExport() tea.Cmd {
 		for _, f := range selectedFiles {
 			// Update UI
 			// Note: This is simplified. tea.Cmd should usually return a single message.
-			// But since we are in a closure, we can't easily send multiple updates 
-			// without a channel or similar. 
+			// But since we are in a closure, we can't easily send multiple updates
+			// without a channel or similar.
 			// For TUI, it's better to use a channel or just do it in chunks.
-			// However, for this implementation, we'll just do it synchronously 
+			// However, for this implementation, we'll just do it synchronously
 			// and return the final message, or use a workaround.
-			
-			exp.CopyFile(f)
+
+			_ = exp.CopyFile(f)
 			// (Progress update would go here if we used a more complex setup)
 		}
-		
+
 		// Add summary.txt
 		// We'd need all changes for a proper summary, but for now:
 		summary := manifest.Generate(selectedFiles)
 		summaryPath := filepath.Join(m.outputPath, "summary.txt")
-		manifest.WriteToFile(summaryPath, summary)
+		_ = manifest.WriteToFile(summaryPath, summary)
 
 		return progressMsg{current: total, total: total, file: "Done"}
 	}
@@ -303,13 +302,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			h = m.height - 5
 		}
 		m.list = list.New(msg, list.NewDefaultDelegate(), w, h)
+		m.list.KeyMap.Quit = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "quit"))
+
 		if m.state == stateFromCommit {
 			m.list.Title = "Select From Commit"
 		} else {
 			m.list.Title = "Select To Commit (after " + m.fromCommit[:7] + ")"
 		}
 		return m, nil
-		
+
 	case []fileItem:
 		m.files = msg
 		m.state = stateFileSelection
@@ -344,21 +345,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.state == stateDone {
 			return m, tea.Quit
 		}
-		
+
 		// ctrl+c always quits
 		if msg.String() == "ctrl+c" {
-			return m, tea.Quit
-		}
-		
-		// q only quits when NOT in a filter mode
-		if msg.String() == "q" {
-			if m.filterMode {
-				break
-			}
-			isListState := m.state == stateFromCommit || m.state == stateToCommit
-			if isListState && m.list.SettingFilter() {
-				break
-			}
 			return m, tea.Quit
 		}
 
@@ -386,14 +375,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case stateFileSelection:
 			m.ensureFilterIdx()
-			if m.filterMode {
+			if m.inputMode {
 				switch msg.String() {
-				case "esc":
-					m.filterMode = false
-					m.filterInput.Blur()
-					return m, nil
-				case "enter":
-					m.filterMode = false
+				case "enter", "esc":
+					m.inputMode = false
 					m.filterInput.Blur()
 					return m, nil
 				default:
@@ -405,7 +390,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			switch msg.String() {
 			case "/":
-				m.filterMode = true
+				m.inputMode = true
 				m.filterInput.Focus()
 				return m, nil
 			case "up", "k":
@@ -423,13 +408,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.files[idx].selected = !m.files[idx].selected
 					}
 				}
-			case "a": // Select all (visible)
+			case "a", "A": // Select all (visible)
 				for _, idx := range m.filteredIdx {
 					if !m.files[idx].disabled {
 						m.files[idx].selected = true
 					}
 				}
-			case "n": // Select none (visible)
+			case "n", "N": // Select none (visible)
 				for _, idx := range m.filteredIdx {
 					m.files[idx].selected = false
 				}
@@ -441,28 +426,37 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "enter":
 				m.state = stateOutputPath
 				return m, nil
+			case "esc":
+				return m, tea.Quit
 			}
 
 		case stateOutputPath:
 			m.input, cmd = m.input.Update(msg)
-			if msg.String() == "enter" {
+			switch msg.String() {
+			case "enter":
 				m.outputPath = m.input.Value()
 				if m.outputPath == "" {
-					m.outputPath = "./export"
+					m.outputPath = defaultOutputPath
 				}
 				m.state = stateConfirm
 				return m, nil
+			case "esc":
+				return m, tea.Quit
 			}
+
 			return m, cmd
 
 		case stateConfirm:
-			if msg.String() == "y" || msg.String() == "enter" {
+			if strings.ToLower(msg.String()) == "y" || msg.String() == "enter" {
 				m.state = stateProgress
 				return m, m.startExport()
 			}
-			if msg.String() == "n" || msg.String() == "backspace" {
+			if strings.ToLower(msg.String()) == "n" || msg.String() == "backspace" {
 				m.state = stateOutputPath
 				return m, nil
+			}
+			if msg.String() == "esc" {
+				return m, tea.Quit
 			}
 		}
 
@@ -479,19 +473,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	var s string
-	
-	s += titleStyle.Render("git-de") + "\n\n"
+	var sb strings.Builder
+
+	sb.WriteString(titleStyle.Render("Git Diff Export") + "\n\n")
 
 	switch m.state {
 	case stateFromCommit, stateToCommit:
-		s += m.list.View()
+		sb.WriteString(m.list.View())
 
 	case stateFileSelection:
-		s += "Select Files to Export:\n\n"
-		
-		if m.filterMode || m.filterInput.Value() != "" {
-			s += m.filterInput.View() + "\n\n"
+		sb.WriteString("Select Files to Export:\n\n")
+
+		if m.inputMode || m.filterInput.Value() != "" {
+			sb.WriteString(m.filterInput.View() + "\n\n")
 		}
 
 		displayIdx := m.filteredIdx
@@ -511,9 +505,7 @@ func (m Model) View() string {
 		if visibleEnd > maxVisible {
 			half := maxVisible / 2
 			visibleStart = m.cursor - half
-			if visibleStart < 0 {
-				visibleStart = 0
-			}
+			visibleStart = max(0, visibleStart)
 			visibleEnd = visibleStart + maxVisible
 			if visibleEnd > len(displayIdx) {
 				visibleEnd = len(displayIdx)
@@ -527,25 +519,25 @@ func (m Model) View() string {
 			if m.cursor == vi {
 				cursor = ">"
 			}
-			
+
 			line := f.Title()
 			if m.cursor == vi {
 				line = selectedStyle.Render(line)
 			}
-			
-			s += fmt.Sprintf("%s %s\n", cursor, line)
+
+			fmt.Fprintf(&sb, "%s %s\n", cursor, line)
 		}
 
-		s += fmt.Sprintf("\n%d/%d files", len(displayIdx), len(m.files))
+		fmt.Fprintf(&sb, "\n%d/%d files", len(displayIdx), len(m.files))
 		if m.filterInput.Value() != "" {
-			s += fmt.Sprintf(" (filter: %s)", m.filterInput.Value())
+			fmt.Fprintf(&sb, " (filter: %s)", m.filterInput.Value())
 		}
-		s += "\n[/:filter] [Space:toggle] [A:all] [N:none] [Enter:continue] [Q:quit]\n"
+		sb.WriteString("\n[/:filter] [Space:toggle] [A:all] [N:none] [Enter:continue] [esc:quit]\n")
 
 	case stateOutputPath:
-		s += "Enter Output Directory:\n\n"
-		s += m.input.View()
-		s += "\n\n[Tab:complete] [Enter:confirm] [Q:quit]\n"
+		sb.WriteString("Enter Output Directory:\n\n")
+		sb.WriteString(m.input.View())
+		sb.WriteString("\n\n[Enter:confirm] [esc:quit]\n")
 
 	case stateConfirm:
 		selectedCount := 0
@@ -554,29 +546,29 @@ func (m Model) View() string {
 				selectedCount++
 			}
 		}
-		s += fmt.Sprintf("Export %d files to %s?\n\n", selectedCount, m.outputPath)
-		
+		fmt.Fprintf(&sb, "Export %d files to %s?\n\n", selectedCount, m.outputPath)
+
 		// Check if directory exists
 		if _, err := os.Stat(m.outputPath); err == nil {
-			s += errorStyle.Render("⚠ Warning: Directory exists and will be overwritten!") + "\n\n"
+			sb.WriteString(errorStyle.Render("⚠ Warning: Directory exists and will be overwritten!") + "\n\n")
 		}
-		
-		s += "[Y:confirm] [N:back] [Q:quit]\n"
+
+		sb.WriteString("[Y:confirm] [N:back] [esc:quit]\n")
 
 	case stateProgress:
-		s += fmt.Sprintf("Exporting... (%d/%d)\n", m.doneFiles, m.totalFiles)
-		s += m.progress.View() + "\n"
-		s += statusStyle.Render("Current: "+m.currentFile) + "\n"
+		fmt.Fprintf(&sb, "Exporting... (%d/%d)\n", m.doneFiles, m.totalFiles)
+		sb.WriteString(m.progress.View() + "\n")
+		sb.WriteString(statusStyle.Render("Current: "+m.currentFile) + "\n")
 
 	case stateDone:
-		s += lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Render("✓ Export Complete!") + "\n"
-		s += fmt.Sprintf("Saved to: %s\n", m.outputPath)
-		s += "\nPress any key to exit\n"
+		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Render("✓ Export Complete!") + "\n")
+		fmt.Fprintf(&sb, "Saved to: %s\n", m.outputPath)
+		sb.WriteString("\nPress any key to exit\n")
 	}
 
 	if m.err != nil {
-		s += "\n" + errorStyle.Render(m.err.Error()) + "\n"
+		sb.WriteString("\n" + errorStyle.Render(m.err.Error()) + "\n")
 	}
 
-	return s
+	return sb.String()
 }
