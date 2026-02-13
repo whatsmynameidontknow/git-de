@@ -1,74 +1,39 @@
 # git-de Roadmap
 
-## Version History
+Focus: Transitioning to a TUI-first interactive Git export experience.
 
-- **v0.1.0** - Initial release with basic export functionality
-- **v0.2.0** - Preview mode (run without `-o` flag)
-- **v0.3.0** - Verbose mode, progress bar, ignore patterns
-- **v0.4.0** - Include patterns, file size limits, archive export, JSON output, TUI ✅ COMPLETE
+## Phase 1: TUI as the Default Experience (High Priority)
+Goal: Make `git-de` launch into the TUI by default when run in a terminal.
 
----
+- [ ] Implement TTY detection (launch TUI only if run in a terminal).
+- [ ] Auto-bypass TUI if positional arguments (from/to) are provided.
+- [ ] Add `--no-tui` flag to explicitly use the classic CLI interface.
+- [ ] Update CLI help to reflect the new default behavior.
+- [ ] Ensure non-interactive environments (CI/CD) default to CLI.
 
-## v0.4.0 Roadmap ✅ COMPLETE
+## Phase 2: Enhanced TUI Functionality
+Goal: Build out the feature set of the new TUI.
 
-Staggered release with 5 features in priority order.
+- [ ] Integrated Help Menu: Press `?` to show all keyboard shortcuts.
+- [ ] Commit Search: Add `/` to search/filter through the commit list.
+- [ ] File Diff Preview: Allow "peeking" at file changes before selecting for export.
+- [ ] Recent Paths: Save and suggest recently used output directories.
+- [ ] Custom Styling: Refine the UI with Lip Gloss (borders, status bars, colors).
 
-### Feature 1: Include Patterns ✅ COMPLETE
-Add `--include` (`-I`) flag for whitelist filtering of files.
+## Phase 3: Core Engine Improvements
+Goal: Optimize the underlying git logic and exporter.
 
-### Feature 2: File Size Limit ✅ COMPLETE
-Add `--max-size` flag to skip files exceeding size limit.
+- [ ] Shallow Clone Support: Better handling of limited history repos.
+- [ ] Submodule Support: Option to include/exclude submodule changes.
+- [ ] Custom Summary Formats: Allow template-based `summary.txt` generation.
+- [ ] Parallel Performance: Optimize concurrent copying for huge diffs.
 
-### Feature 3: Archive Export ✅ COMPLETE
-Add `--archive` (`-a`) flag to export directly to archive file (zip/tar/tar.gz).
+## Phase 4: Distribution & DevOps
+Goal: Make git-de easy to install and update.
 
-### Feature 4: JSON Output ✅ COMPLETE
-Add `--json` flag to output results in JSON format.
-
-### Feature 5: TUI (Terminal User Interface) ✅ COMPLETE
-Add `--tui` flag for interactive commit and file selection.
-
----
-
-## Technical Considerations
-
-### Dependencies
-- `github.com/charmbracelet/bubbletea` - TUI framework
-- `github.com/charmbracelet/lipgloss` - Styling
-- `github.com/charmbracelet/bubbles` - UI components
-
-### Testing Strategy
-- CLI flag parsing tests: ✅ Pass
-- Exporter logic tests: ✅ Pass
-- Git logic tests: ✅ Pass
-- Build check: ✅ Pass
-
-### Documentation Updates
-- Update README.md: ✅ Done
+- [ ] GoReleaser Integration: Automated multi-arch builds for every tag.
+- [ ] Semantic Versioning: Switch to strict semver for stability.
+- [ ] Automated Testing: Expand integration tests for complex git scenarios.
 
 ---
-
-## Completed Features Archive
-
-### v0.4.0 Features
-- ✅ **Include patterns** (`-I` flag)
-- ✅ **File size limit** (`--max-size` flag)
-- ✅ **Archive export** (`-a` flag)
-- ✅ **JSON output** (`--json` flag)
-- ✅ **Interactive TUI** (`--tui` flag)
-
-### v0.3.0 Features
-- ✅ Verbose mode (`-v`)
-- ✅ Progress bar (default, silent mode)
-- ✅ Ignore patterns (`-i`, comma-separated)
-- ✅ Better warning messages
-- ✅ Renamed/copied file details
-
-### v0.2.0 Features
-- ✅ Preview mode (run without `-o`)
-
-### v0.1.0 Features
-- ✅ Basic export functionality
-- ✅ Concurrent copying
-- ✅ Overwrite protection
-- ✅ Cross-platform builds
+*Roadmap updated 2026-02-13. Let's build the best Git export tool. 🦞*
