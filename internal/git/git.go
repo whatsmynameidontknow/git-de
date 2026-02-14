@@ -107,7 +107,7 @@ func (c *Client) parseDiffOutput(output string) ([]FileChange, error) {
 }
 
 func (c *Client) parseLine(line string) (FileChange, error) {
-	fields := strings.Fields(line)
+	fields := strings.Split(line, "\t")
 	if len(fields) < 2 {
 		return FileChange{}, fmt.Errorf("invalid diff line: %s", line)
 	}
