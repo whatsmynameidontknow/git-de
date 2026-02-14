@@ -11,7 +11,7 @@ import (
 )
 
 func (m Model) loadBranchesCmd() tea.Msg {
-	branches, err := m.gitClient.GetBranches()
+	branches, err := m.gitClient.GetBranchesWithAheadBehind()
 	if err != nil {
 		return err
 	}

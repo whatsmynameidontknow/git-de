@@ -93,9 +93,21 @@ func NewModel(client *git.Client, from, to string) Model {
 	}
 
 	if from != "" && to != "" {
-		m.state = stateFileSelection
+		m.state = stateCommitRangeSummary
+		// Auto-detect current branch
+		if client != nil {
+			if branch, err := client.GetCurrentBranch(); err == nil {
+				m.selectedBranch = branch
+			}
+		}
 	} else if from != "" {
 		m.state = stateToCommit
+		// Auto-detect current branch
+		if client != nil {
+			if branch, err := client.GetCurrentBranch(); err == nil {
+				m.selectedBranch = branch
+			}
+		}
 	} else {
 		m.state = stateBranchSelection
 	}
@@ -118,6 +130,8 @@ func (m Model) Init() tea.Cmd {
 		return m.loadBranchesCmd
 	case stateCommitLimitSelection:
 		return m.loadLimitOptionsCmd
+	case stateCommitRangeSummary:
+		return m.loadRangeStatsCmd
 	case stateToCommit:
 		return m.loadToCommitsCmd
 	case stateFileSelection:

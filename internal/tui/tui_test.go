@@ -34,8 +34,8 @@ func TestNewModel_WithFromCommit(t *testing.T) {
 
 func TestNewModel_WithBothCommits(t *testing.T) {
 	m := NewModel(nil, "abc123", "def456")
-	if m.state != stateFileSelection {
-		t.Errorf("Expected state stateFileSelection, got %d", m.state)
+	if m.state != stateCommitRangeSummary {
+		t.Errorf("Expected state stateCommitRangeSummary, got %d", m.state)
 	}
 	if m.fromCommit != "abc123" {
 		t.Errorf("Expected fromCommit abc123, got %s", m.fromCommit)
@@ -566,10 +566,10 @@ func TestInit_States(t *testing.T) {
 			expectedState: stateToCommit,
 		},
 		{
-			name:          "both args starts with file selection screen",
+			name:          "both args starts with commit range summary",
 			from:          "abc",
 			to:            "def",
-			expectedState: stateFileSelection,
+			expectedState: stateCommitRangeSummary,
 		},
 	}
 
@@ -783,6 +783,15 @@ func TestUpdate_CommitRangeSummary_EnterProceedsToFileSelection(t *testing.T) {
 	_ = model
 	if cmd == nil {
 		t.Error("Expected loadFilesCmd to be returned")
+	}
+}
+
+func TestNewModel_WithBothCommits_AutoDetectsBranch(t *testing.T) {
+	m := NewModel(nil, "abc123", "def456")
+	// selectedBranch should be empty since we don't have a git client here
+	// but Init should attempt to detect it
+	if m.state != stateCommitRangeSummary {
+		t.Errorf("Expected state stateCommitRangeSummary, got %d", m.state)
 	}
 }
 

@@ -29,6 +29,17 @@ type CommitRangeStats struct {
 	Deletions    int
 }
 
+// GetCurrentBranch returns the name of the currently checked-out branch.
+func (c *Client) GetCurrentBranch() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = c.workDir
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("get current branch: %w", err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
 // GetDefaultBranch detects the repository's default branch.
 // Tries origin/HEAD first, then falls back to main/master.
 func (c *Client) GetDefaultBranch() (string, error) {
@@ -140,6 +151,62 @@ func (c *Client) GetBranches() ([]Branch, error) {
 		}
 		return branches[i].LastCommit.After(branches[j].LastCommit)
 	})
+
+	return branches, nil
+}
+
+// GetBranchesFiltered returns branches with optional merged remote filtering.
+// If hideMergedRemotes is true, remote branches fully merged into the default branch are excluded.
+func (c *Client) GetBranchesFiltered(hideMergedRemotes bool) ([]Branch, error) {
+	branches, err := c.GetBranches()
+	if err != nil {
+		return nil, err
+	}
+
+	if !hideMergedRemotes {
+		return branches, nil
+	}
+
+	defaultBranch, _ := c.GetDefaultBranch()
+	if defaultBranch == "" {
+		return branches, nil // Can't filter without a default branch
+	}
+
+	var filtered []Branch
+	for _, b := range branches {
+		if b.IsRemote && c.IsBranchMerged(b.Name, defaultBranch) {
+			continue // Skip merged remote branches
+		}
+		filtered = append(filtered, b)
+	}
+
+	return filtered, nil
+}
+
+// GetBranchesWithAheadBehind returns branches with ahead/behind counts populated.
+func (c *Client) GetBranchesWithAheadBehind() ([]Branch, error) {
+	branches, err := c.GetBranchesFiltered(true)
+	if err != nil {
+		return nil, err
+	}
+
+	defaultBranch, _ := c.GetDefaultBranch()
+
+	for i := range branches {
+		if defaultBranch == "" || branches[i].Name == defaultBranch {
+			branches[i].Ahead = 0
+			branches[i].Behind = 0
+			continue
+		}
+		ahead, behind, err := c.GetBranchAheadBehind(branches[i].Name, defaultBranch)
+		if err != nil {
+			branches[i].Ahead = -1
+			branches[i].Behind = -1
+		} else {
+			branches[i].Ahead = ahead
+			branches[i].Behind = behind
+		}
+	}
 
 	return branches, nil
 }

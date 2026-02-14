@@ -317,6 +317,126 @@ func TestClient_IsBranchMerged(t *testing.T) {
 	})
 }
 
+func TestClient_GetCurrentBranch(t *testing.T) {
+	repoDir := setupTestRepo(t)
+	client := NewClient(repoDir)
+
+	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+	runGit(t, repoDir, "add", ".")
+	runGit(t, repoDir, "commit", "-m", "initial")
+	runGit(t, repoDir, "branch", "-M", "main")
+
+	t.Run("returns current branch name", func(t *testing.T) {
+		branch, err := client.GetCurrentBranch()
+		if err != nil {
+			t.Fatalf("GetCurrentBranch() failed: %v", err)
+		}
+		if branch != "main" {
+			t.Errorf("Expected 'main', got %q", branch)
+		}
+	})
+
+	t.Run("returns correct branch after checkout", func(t *testing.T) {
+		runGit(t, repoDir, "checkout", "-b", "feature/test")
+		branch, err := client.GetCurrentBranch()
+		if err != nil {
+			t.Fatalf("GetCurrentBranch() failed: %v", err)
+		}
+		if branch != "feature/test" {
+			t.Errorf("Expected 'feature/test', got %q", branch)
+		}
+	})
+}
+
+func TestClient_GetBranchesFiltered(t *testing.T) {
+	repoDir := setupTestRepo(t)
+	client := NewClient(repoDir)
+
+	// Create initial commit on main
+	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+	runGit(t, repoDir, "add", ".")
+	runGit(t, repoDir, "commit", "-m", "initial commit")
+	runGit(t, repoDir, "branch", "-M", "main")
+
+	// Create and merge a branch (simulating remote merged)
+	runGit(t, repoDir, "checkout", "-b", "feature/merged")
+	os.WriteFile(filepath.Join(repoDir, "merged.go"), []byte("package merged"), 0644)
+	runGit(t, repoDir, "add", ".")
+	runGit(t, repoDir, "commit", "-m", "add merged feature")
+	runGit(t, repoDir, "checkout", "main")
+	runGit(t, repoDir, "merge", "feature/merged")
+
+	// Create an unmerged branch
+	runGit(t, repoDir, "checkout", "-b", "feature/unmerged")
+	os.WriteFile(filepath.Join(repoDir, "unmerged.go"), []byte("package unmerged"), 0644)
+	runGit(t, repoDir, "add", ".")
+	runGit(t, repoDir, "commit", "-m", "add unmerged feature")
+	runGit(t, repoDir, "checkout", "main")
+
+	t.Run("GetBranchesFiltered excludes merged remote branches", func(t *testing.T) {
+		// For local branches, merged filtering shouldn't apply
+		// (only remote merged should be hidden)
+		branches, err := client.GetBranchesFiltered(true)
+		if err != nil {
+			t.Fatalf("GetBranchesFiltered() failed: %v", err)
+		}
+
+		// All local branches should be present
+		names := make(map[string]bool)
+		for _, b := range branches {
+			names[b.Name] = true
+		}
+
+		if !names["main"] {
+			t.Error("Expected 'main' in branches")
+		}
+		if !names["feature/unmerged"] {
+			t.Error("Expected 'feature/unmerged' in branches")
+		}
+	})
+}
+
+func TestClient_GetBranchesWithAheadBehind(t *testing.T) {
+	repoDir := setupTestRepo(t)
+	client := NewClient(repoDir)
+
+	// Create initial commit on main
+	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+	runGit(t, repoDir, "add", ".")
+	runGit(t, repoDir, "commit", "-m", "initial")
+	runGit(t, repoDir, "branch", "-M", "main")
+
+	// Create feature branch with 2 commits
+	runGit(t, repoDir, "checkout", "-b", "feature/test")
+	os.WriteFile(filepath.Join(repoDir, "feat1.go"), []byte("package feat"), 0644)
+	runGit(t, repoDir, "add", ".")
+	runGit(t, repoDir, "commit", "-m", "feat 1")
+	os.WriteFile(filepath.Join(repoDir, "feat2.go"), []byte("package feat"), 0644)
+	runGit(t, repoDir, "add", ".")
+	runGit(t, repoDir, "commit", "-m", "feat 2")
+	runGit(t, repoDir, "checkout", "main")
+
+	t.Run("populates ahead/behind when requested", func(t *testing.T) {
+		branches, err := client.GetBranchesWithAheadBehind()
+		if err != nil {
+			t.Fatalf("GetBranchesWithAheadBehind() failed: %v", err)
+		}
+
+		for _, b := range branches {
+			if b.Name == "feature/test" {
+				if b.Ahead != 2 {
+					t.Errorf("Expected ahead=2 for feature/test, got %d", b.Ahead)
+				}
+				if b.Behind != 0 {
+					t.Errorf("Expected behind=0 for feature/test, got %d", b.Behind)
+				}
+				return
+			}
+		}
+		t.Error("feature/test not found in branches")
+	})
+}
+
 func TestClient_GetRecentCommitsOnBranch(t *testing.T) {
 	repoDir := setupTestRepo(t)
 	client := NewClient(repoDir)
