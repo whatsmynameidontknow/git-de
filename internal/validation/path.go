@@ -1,9 +1,12 @@
 package validation
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 )
 
@@ -22,27 +25,33 @@ func ValidatePath(path string) error {
 	// Clean the path
 	path = filepath.Clean(path)
 
+	if !fs.ValidPath(path) {
+		return errors.New("invalid path")
+	}
+
 	if runtime.GOOS == "windows" {
 		return validateWindowsPath(path)
 	}
-	return validateUnixPath(path)
-}
 
-func validateUnixPath(path string) error {
-	// Unix only forbids null bytes and empty components
-	// filepath.Clean handles . and ..
 	return nil
 }
 
+// Windows invalid characters: < > : " | ? *
+const windowsInvalidChars = `<>:"|?*`
+
 func validateWindowsPath(path string) error {
-	// Windows invalid characters: < > : " | ? *
-	invalidChars := `<>:"|?*`
-	for _, char := range invalidChars {
+	volume := filepath.VolumeName(path)
+	if volume != "" && filepath.Dir(volume) == volume+"." {
+		fmt.Println(volume)
+		goto reserved_names_check
+	}
+	for _, char := range windowsInvalidChars {
 		if strings.ContainsRune(path, char) {
 			return fmt.Errorf("path contains invalid character: %q", char)
 		}
 	}
 
+reserved_names_check:
 	// Check for reserved names (CON, PRN, AUX, NUL, COM1-9, LPT1-9)
 	// Get the base name without extension
 	base := filepath.Base(path)
@@ -52,10 +61,8 @@ func validateWindowsPath(path string) error {
 	base = strings.ToUpper(base)
 
 	reservedNames := []string{"CON", "PRN", "AUX", "NUL"}
-	for _, name := range reservedNames {
-		if base == name {
-			return fmt.Errorf("%q is a reserved name on Windows", base)
-		}
+	if slices.Contains(reservedNames, base) {
+		return fmt.Errorf("%q is a reserved name on Windows", base)
 	}
 
 	for i := 1; i <= 9; i++ {

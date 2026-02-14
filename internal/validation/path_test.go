@@ -50,6 +50,7 @@ func TestValidatePath_WindowsInvalidChars(t *testing.T) {
 		"test|path",
 		"test?path",
 		"test*path",
+		`\\inval*id\a:\b`,
 	}
 
 	for _, path := range invalidPaths {
