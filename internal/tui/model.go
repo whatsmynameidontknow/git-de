@@ -19,6 +19,9 @@ type Model struct {
 	gitClient *git.Client
 	err       error
 
+	// Branch selection
+	selectedBranch string
+
 	// Inputs
 	fromCommit string
 	toCommit   string
@@ -27,6 +30,9 @@ type Model struct {
 	// Commit limit
 	commitLimit int
 	limitInput  textinput.Model
+
+	// Commit range stats
+	rangeStats git.CommitRangeStats
 
 	// Components
 	list     list.Model
@@ -91,7 +97,7 @@ func NewModel(client *git.Client, from, to string) Model {
 	} else if from != "" {
 		m.state = stateToCommit
 	} else {
-		m.state = stateCommitLimitSelection
+		m.state = stateBranchSelection
 	}
 
 	return m
@@ -108,6 +114,8 @@ func Run(client *git.Client, from, to string) error {
 // Init returns the initial command for the Bubble Tea program.
 func (m Model) Init() tea.Cmd {
 	switch m.state {
+	case stateBranchSelection:
+		return m.loadBranchesCmd
 	case stateCommitLimitSelection:
 		return m.loadLimitOptionsCmd
 	case stateToCommit:

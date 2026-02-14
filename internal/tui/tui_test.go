@@ -11,8 +11,8 @@ import (
 
 func TestNewModel_NoCommits(t *testing.T) {
 	m := NewModel(nil, "", "")
-	if m.state != stateCommitLimitSelection {
-		t.Errorf("Expected state stateCommitLimitSelection, got %d", m.state)
+	if m.state != stateBranchSelection {
+		t.Errorf("Expected state stateBranchSelection, got %d", m.state)
 	}
 	if m.fromCommit != "" {
 		t.Errorf("Expected empty fromCommit, got %s", m.fromCommit)
@@ -57,8 +57,8 @@ func TestUpdate_EarlyKeyPressDoesNotPanic(t *testing.T) {
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	model := updated.(Model)
 
-	if model.state != stateCommitLimitSelection {
-		t.Errorf("Expected state stateCommitLimitSelection, got %d", model.state)
+	if model.state != stateBranchSelection {
+		t.Errorf("Expected state stateBranchSelection, got %d", model.state)
 	}
 }
 
@@ -255,6 +255,7 @@ func TestUpdate_CommitsLoaded(t *testing.T) {
 
 func TestUpdate_LimitOptionsLoaded(t *testing.T) {
 	m := NewModel(nil, "", "")
+	m.state = stateCommitLimitSelection
 
 	items := []list.Item{
 		limitOption{label: "50 commits (default)", value: 50},
@@ -444,6 +445,7 @@ func TestValidateCommitLimit(t *testing.T) {
 
 func TestUpdate_LimitSelection_Predefined(t *testing.T) {
 	m := NewModel(nil, "", "")
+	m.state = stateCommitLimitSelection
 
 	// Load limit options into the list
 	var items []list.Item
@@ -470,6 +472,7 @@ func TestUpdate_LimitSelection_Predefined(t *testing.T) {
 
 func TestUpdate_LimitSelection_Custom(t *testing.T) {
 	m := NewModel(nil, "", "")
+	m.state = stateCommitLimitSelection
 
 	// Load limit options into the list
 	var items []list.Item
@@ -551,10 +554,10 @@ func TestInit_States(t *testing.T) {
 		expectedState sessionState
 	}{
 		{
-			name:          "no args starts with limit options",
+			name:          "no args starts with branch selection",
 			from:          "",
 			to:            "",
-			expectedState: stateCommitLimitSelection,
+			expectedState: stateBranchSelection,
 		},
 		{
 			name:          "from arg starts with to-commit selection screen",
@@ -610,6 +613,192 @@ func TestView_FileSelection_ShowsSelectedCount(t *testing.T) {
 
 	if !contains(view, "2 selected") {
 		t.Error("Expected '2 selected' in view")
+	}
+}
+
+// --- Branch Selection Tests ---
+
+func TestUpdate_BranchesLoaded(t *testing.T) {
+	m := NewModel(nil, "", "")
+	// state is stateBranchSelection by default
+
+	items := []list.Item{
+		branchItem{branch: git.Branch{Name: "main", IsCurrent: true, LastMessage: "initial"}},
+		branchItem{branch: git.Branch{Name: "feature/auth", LastMessage: "add auth"}},
+	}
+
+	updated, _ := m.Update(items)
+	model := updated.(Model)
+
+	if model.list.Title != "Select Branch" {
+		t.Errorf("Expected list title 'Select Branch', got %s", model.list.Title)
+	}
+}
+
+func TestUpdate_BranchSelection_EnterSelectsBranch(t *testing.T) {
+	m := NewModel(nil, "", "")
+
+	// Load branches
+	items := []list.Item{
+		branchItem{branch: git.Branch{Name: "main", IsCurrent: true, LastMessage: "initial"}},
+		branchItem{branch: git.Branch{Name: "feature/auth", LastMessage: "add auth"}},
+	}
+	updated, _ := m.Update(items)
+	model := updated.(Model)
+
+	// Select first branch (main)
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+
+	if model.state != stateCommitLimitSelection {
+		t.Errorf("Expected state stateCommitLimitSelection, got %d", model.state)
+	}
+	if model.selectedBranch != "main" {
+		t.Errorf("Expected selectedBranch 'main', got %q", model.selectedBranch)
+	}
+	if cmd == nil {
+		t.Error("Expected loadLimitOptionsCmd to be returned")
+	}
+}
+
+func TestBranchItem_Title(t *testing.T) {
+	tests := []struct {
+		name     string
+		branch   git.Branch
+		expected string
+	}{
+		{
+			name:     "current branch",
+			branch:   git.Branch{Name: "main", IsCurrent: true},
+			expected: "* main",
+		},
+		{
+			name:     "non-current branch",
+			branch:   git.Branch{Name: "feature/auth"},
+			expected: "  feature/auth",
+		},
+		{
+			name:     "remote branch",
+			branch:   git.Branch{Name: "origin/develop", IsRemote: true},
+			expected: "  origin/develop (remote)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			item := branchItem{branch: tt.branch}
+			if item.Title() != tt.expected {
+				t.Errorf("Title() = %q, expected %q", item.Title(), tt.expected)
+			}
+		})
+	}
+}
+
+func TestBranchItem_Description(t *testing.T) {
+	tests := []struct {
+		name     string
+		branch   git.Branch
+		contains string
+	}{
+		{
+			name:     "with ahead/behind",
+			branch:   git.Branch{Name: "feature", Ahead: 3, Behind: 1, LastMessage: "some msg"},
+			contains: "↑3 ↓1",
+		},
+		{
+			name:     "not loaded yet",
+			branch:   git.Branch{Name: "feature", Ahead: -1, Behind: -1, LastMessage: "some msg"},
+			contains: "some msg",
+		},
+		{
+			name:     "zero ahead/behind shows nothing",
+			branch:   git.Branch{Name: "feature", Ahead: 0, Behind: 0, LastMessage: "msg"},
+			contains: "msg",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			item := branchItem{branch: tt.branch}
+			desc := item.Description()
+			if !contains(desc, tt.contains) {
+				t.Errorf("Description() = %q, expected to contain %q", desc, tt.contains)
+			}
+		})
+	}
+}
+
+func TestBranchItem_FilterValue(t *testing.T) {
+	item := branchItem{branch: git.Branch{Name: "feature/auth"}}
+	if item.FilterValue() != "feature/auth" {
+		t.Errorf("FilterValue() = %q, expected 'feature/auth'", item.FilterValue())
+	}
+}
+
+func TestView_CommitRangeSummary(t *testing.T) {
+	m := NewModel(nil, "abc1234567", "def4567890")
+	m.state = stateCommitRangeSummary
+	m.selectedBranch = "feature/auth"
+	m.rangeStats = git.CommitRangeStats{
+		CommitCount:  12,
+		FilesChanged: 47,
+		Additions:    1234,
+		Deletions:    567,
+	}
+
+	view := m.View()
+
+	if !contains(view, "feature/auth") {
+		t.Error("Expected branch name in view")
+	}
+	if !contains(view, "abc1234") {
+		t.Error("Expected from commit in view")
+	}
+	if !contains(view, "def4567") {
+		t.Error("Expected to commit in view")
+	}
+	if !contains(view, "12") {
+		t.Error("Expected commit count in view")
+	}
+	if !contains(view, "47") {
+		t.Error("Expected files changed in view")
+	}
+	if !contains(view, "+1234") {
+		t.Error("Expected additions in view")
+	}
+	if !contains(view, "-567") {
+		t.Error("Expected deletions in view")
+	}
+}
+
+func TestUpdate_CommitRangeSummary_EnterProceedsToFileSelection(t *testing.T) {
+	m := NewModel(nil, "abc", "def")
+	m.state = stateCommitRangeSummary
+	m.rangeStats = git.CommitRangeStats{CommitCount: 5}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	// Enter should trigger loadFilesCmd (can't check state directly since cmd is async)
+	_ = model
+	if cmd == nil {
+		t.Error("Expected loadFilesCmd to be returned")
+	}
+}
+
+func TestUpdate_CommitRangeSummary_BackspaceGoesToToCommit(t *testing.T) {
+	m := NewModel(nil, "abc", "def")
+	m.state = stateCommitRangeSummary
+	m.rangeStats = git.CommitRangeStats{CommitCount: 5}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	model := updated.(Model)
+
+	if model.state != stateToCommit {
+		t.Errorf("Expected state stateToCommit, got %d", model.state)
+	}
+	if cmd == nil {
+		t.Error("Expected loadToCommitsCmd to be returned")
 	}
 }
 

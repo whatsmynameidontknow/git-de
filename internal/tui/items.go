@@ -6,6 +6,46 @@ import (
 	"github.com/whatsmynameidontknow/git-de/internal/git"
 )
 
+type branchItem struct {
+	branch git.Branch
+}
+
+func (b branchItem) Title() string {
+	marker := "  "
+	if b.branch.IsCurrent {
+		marker = "* "
+	}
+
+	remote := ""
+	if b.branch.IsRemote {
+		remote = " (remote)"
+	}
+
+	return fmt.Sprintf("%s%s%s", marker, b.branch.Name, remote)
+}
+
+func (b branchItem) Description() string {
+	aheadBehind := ""
+	if b.branch.Ahead >= 0 && b.branch.Behind >= 0 {
+		if b.branch.Ahead > 0 || b.branch.Behind > 0 {
+			aheadBehind = fmt.Sprintf("↑%d ↓%d  ", b.branch.Ahead, b.branch.Behind)
+		}
+	} else {
+		aheadBehind = ""
+	}
+
+	msg := b.branch.LastMessage
+	if msg == "" {
+		return aheadBehind
+	}
+
+	return fmt.Sprintf("%s%s", aheadBehind, msg)
+}
+
+func (b branchItem) FilterValue() string {
+	return b.branch.Name
+}
+
 type commitItem struct {
 	sha     string
 	message string

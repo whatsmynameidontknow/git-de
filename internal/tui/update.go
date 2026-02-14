@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/whatsmynameidontknow/git-de/internal/git"
 	"github.com/whatsmynameidontknow/git-de/internal/validation"
 )
 
@@ -15,6 +16,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case git.CommitRangeStats:
+		m.rangeStats = msg
+		m.state = stateCommitRangeSummary
+		return m, nil
+
 	case []list.Item:
 		return m.handleListItems(msg)
 
@@ -57,7 +63,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		// Forward non-key messages (e.g. FilterMatchesMsg, spinner ticks)
 		// to the list so filtering actually works.
-		if m.state == stateCommitLimitSelection || m.state == stateFromCommit || m.state == stateToCommit {
+		if m.state == stateBranchSelection || m.state == stateCommitLimitSelection || m.state == stateFromCommit || m.state == stateToCommit {
 			m.list, cmd = m.list.Update(msg)
 			return m, cmd
 		}
@@ -78,6 +84,17 @@ func (m Model) handleListItems(items []list.Item) (tea.Model, tea.Cmd) {
 	m.list.KeyMap.Quit = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "quit"))
 
 	switch m.state {
+	case stateBranchSelection:
+		m.list.Title = "Select Branch"
+		backspaceBinding := key.NewBinding(key.WithKeys("backspace"), key.WithHelp("backspace", "back"))
+		refreshBinding := key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh"))
+		checkoutBinding := key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "checkout"))
+		m.list.AdditionalShortHelpKeys = func() []key.Binding {
+			return []key.Binding{refreshBinding, checkoutBinding, backspaceBinding}
+		}
+		m.list.AdditionalFullHelpKeys = func() []key.Binding {
+			return []key.Binding{refreshBinding, checkoutBinding, backspaceBinding}
+		}
 	case stateCommitLimitSelection:
 		m.list.Title = "Select Commit History Depth"
 		// Disable filtering for commit limit selection (only 6 options)
@@ -148,6 +165,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch m.state {
+	case stateBranchSelection:
+		return m.handleKeyBranchSelection(msg)
 	case stateCommitLimitSelection:
 		return m.handleKeyLimitSelection(msg)
 	case stateCommitLimitCustom:
@@ -156,6 +175,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleKeyFromCommit(msg)
 	case stateToCommit:
 		return m.handleKeyToCommit(msg)
+	case stateCommitRangeSummary:
+		return m.handleKeyCommitRangeSummary(msg)
 	case stateFileSelection:
 		return m.handleKeyFileSelection(msg)
 	case stateOutputPath:
@@ -165,6 +186,34 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m Model) handleKeyBranchSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "enter" && !m.list.SettingFilter() {
+		if item := m.list.SelectedItem(); item != nil {
+			bi := item.(branchItem)
+			m.selectedBranch = bi.branch.Name
+			m.state = stateCommitLimitSelection
+			return m, m.loadLimitOptionsCmd
+		}
+	}
+	if msg.String() == "r" && !m.list.SettingFilter() {
+		return m, m.loadBranchesCmd
+	}
+	if msg.String() == "c" && !m.list.SettingFilter() {
+		if item := m.list.SelectedItem(); item != nil {
+			bi := item.(branchItem)
+			if err := m.gitClient.CheckoutBranch(bi.branch.Name); err != nil {
+				m.err = err
+				return m, nil
+			}
+			// Refresh branches after checkout
+			return m, m.loadBranchesCmd
+		}
+	}
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
 }
 
 func (m Model) handleKeyLimitSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -179,7 +228,16 @@ func (m Model) handleKeyLimitSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.commitLimit = opt.value
 			m.state = stateFromCommit
+			if m.selectedBranch != "" {
+				return m, m.loadCommitsOnBranchCmd
+			}
 			return m, m.loadCommitsCmd
+		}
+	}
+	if msg.String() == "backspace" && !m.list.SettingFilter() {
+		if m.selectedBranch != "" {
+			m.state = stateBranchSelection
+			return m, m.loadBranchesCmd
 		}
 	}
 	var cmd tea.Cmd
@@ -199,6 +257,9 @@ func (m Model) handleKeyLimitCustom(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.commitLimit = limit
 			m.err = nil
 			m.state = stateFromCommit
+			if m.selectedBranch != "" {
+				return m, m.loadCommitsOnBranchCmd
+			}
 			return m, m.loadCommitsCmd
 		}
 	case "esc":
@@ -218,6 +279,9 @@ func (m Model) handleKeyFromCommit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if item := m.list.SelectedItem(); item != nil {
 			m.fromCommit = item.(commitItem).sha
 			m.state = stateToCommit
+			if m.selectedBranch != "" {
+				return m, m.loadToCommitsOnBranchCmd
+			}
 			return m, m.loadToCommitsCmd
 		}
 	}
@@ -234,16 +298,35 @@ func (m Model) handleKeyToCommit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "enter" && !m.list.SettingFilter() {
 		if item := m.list.SelectedItem(); item != nil {
 			m.toCommit = item.(commitItem).sha
-			return m, m.loadFilesCmd
+			return m, m.loadRangeStatsCmd
 		}
 	}
 	if msg.String() == "backspace" && !m.list.SettingFilter() {
 		m.state = stateFromCommit
+		if m.selectedBranch != "" {
+			return m, m.loadCommitsOnBranchCmd
+		}
 		return m, m.loadCommitsCmd
 	}
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
 	return m, cmd
+}
+
+func (m Model) handleKeyCommitRangeSummary(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter", "y", "Y":
+		return m, m.loadFilesCmd
+	case "backspace", "n", "N":
+		m.state = stateToCommit
+		if m.selectedBranch != "" {
+			return m, m.loadToCommitsOnBranchCmd
+		}
+		return m, m.loadToCommitsCmd
+	case "esc":
+		return m, tea.Quit
+	}
+	return m, nil
 }
 
 func (m Model) handleKeyFileSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

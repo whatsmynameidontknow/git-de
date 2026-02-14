@@ -7,10 +7,12 @@ import (
 type sessionState int
 
 const (
-	stateCommitLimitSelection sessionState = iota
+	stateBranchSelection sessionState = iota
+	stateCommitLimitSelection
 	stateCommitLimitCustom
 	stateFromCommit
 	stateToCommit
+	stateCommitRangeSummary
 	stateFileSelection
 	stateOutputPath
 	stateConfirm
