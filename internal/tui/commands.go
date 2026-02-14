@@ -10,6 +10,68 @@ import (
 	"github.com/whatsmynameidontknow/git-de/internal/manifest"
 )
 
+func (m Model) loadBranchesCmd() tea.Msg {
+	branches, err := m.gitClient.GetBranchesWithAheadBehind()
+	if err != nil {
+		return err
+	}
+	var items []list.Item
+	for _, b := range branches {
+		items = append(items, branchItem{branch: b})
+	}
+	return items
+}
+
+func (m Model) loadCommitsOnBranchCmd() tea.Msg {
+	commits, err := m.gitClient.GetRecentCommitsOnBranch(m.selectedBranch, m.commitLimit)
+	if err != nil {
+		return err
+	}
+	var items []list.Item
+	for _, c := range commits {
+		items = append(items, commitItem{sha: c.Hash, message: c.Message})
+	}
+	return items
+}
+
+func (m Model) loadToCommitsOnBranchCmd() tea.Msg {
+	// Get commits after fromCommit on the selected branch
+	commits, err := m.gitClient.GetRecentCommitsOnBranch(m.selectedBranch, m.commitLimit)
+	if err != nil {
+		return err
+	}
+	// Filter to only commits after fromCommit
+	var items []list.Item
+	foundFrom := false
+	for _, c := range commits {
+		if c.Hash == m.fromCommit {
+			foundFrom = true
+			continue
+		}
+		if !foundFrom {
+			items = append(items, commitItem{sha: c.Hash, message: c.Message})
+		}
+	}
+	// If fromCommit not found in list (e.g., it's older), show all
+	if !foundFrom {
+		items = nil
+		for _, c := range commits {
+			if c.Hash != m.fromCommit {
+				items = append(items, commitItem{sha: c.Hash, message: c.Message})
+			}
+		}
+	}
+	return items
+}
+
+func (m Model) loadRangeStatsCmd() tea.Msg {
+	stats, err := m.gitClient.GetCommitRangeStats(m.fromCommit, m.toCommit)
+	if err != nil {
+		return err
+	}
+	return stats
+}
+
 func (m Model) loadLimitOptionsCmd() tea.Msg {
 	var items []list.Item
 	for _, opt := range commitLimitOptions {

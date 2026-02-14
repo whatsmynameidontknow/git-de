@@ -19,6 +19,9 @@ type Model struct {
 	gitClient *git.Client
 	err       error
 
+	// Branch selection
+	selectedBranch string
+
 	// Inputs
 	fromCommit string
 	toCommit   string
@@ -27,6 +30,9 @@ type Model struct {
 	// Commit limit
 	commitLimit int
 	limitInput  textinput.Model
+
+	// Commit range stats
+	rangeStats git.CommitRangeStats
 
 	// Components
 	list     list.Model
@@ -87,11 +93,23 @@ func NewModel(client *git.Client, from, to string) Model {
 	}
 
 	if from != "" && to != "" {
-		m.state = stateFileSelection
+		m.state = stateCommitRangeSummary
+		// Auto-detect current branch
+		if client != nil {
+			if branch, err := client.GetCurrentBranch(); err == nil {
+				m.selectedBranch = branch
+			}
+		}
 	} else if from != "" {
 		m.state = stateToCommit
+		// Auto-detect current branch
+		if client != nil {
+			if branch, err := client.GetCurrentBranch(); err == nil {
+				m.selectedBranch = branch
+			}
+		}
 	} else {
-		m.state = stateCommitLimitSelection
+		m.state = stateBranchSelection
 	}
 
 	return m
@@ -108,8 +126,12 @@ func Run(client *git.Client, from, to string) error {
 // Init returns the initial command for the Bubble Tea program.
 func (m Model) Init() tea.Cmd {
 	switch m.state {
+	case stateBranchSelection:
+		return m.loadBranchesCmd
 	case stateCommitLimitSelection:
 		return m.loadLimitOptionsCmd
+	case stateCommitRangeSummary:
+		return m.loadRangeStatsCmd
 	case stateToCommit:
 		return m.loadToCommitsCmd
 	case stateFileSelection:

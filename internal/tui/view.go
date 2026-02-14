@@ -15,6 +15,9 @@ func (m Model) View() string {
 	sb.WriteString(titleStyle.Render("Git Diff Export") + "\n\n")
 
 	switch m.state {
+	case stateBranchSelection:
+		sb.WriteString(m.list.View())
+
 	case stateCommitLimitSelection:
 		sb.WriteString(m.list.View())
 
@@ -23,6 +26,9 @@ func (m Model) View() string {
 
 	case stateFromCommit, stateToCommit:
 		sb.WriteString(m.list.View())
+
+	case stateCommitRangeSummary:
+		m.viewCommitRangeSummary(&sb)
 
 	case stateFileSelection:
 		m.viewFileSelection(&sb)
@@ -53,6 +59,22 @@ func (m Model) viewLimitCustom(sb *strings.Builder) {
 	sb.WriteString("\n\n")
 	sb.WriteString(statusStyle.Render("Enter a number between 1 and 999999"))
 	sb.WriteString("\n[Enter:confirm] [esc:back]\n")
+}
+
+func (m Model) viewCommitRangeSummary(sb *strings.Builder) {
+	sb.WriteString("Commit Range Summary:\n\n")
+
+	if m.selectedBranch != "" {
+		fmt.Fprintf(sb, "Branch:        %s\n", m.selectedBranch)
+	}
+	fmt.Fprintf(sb, "From:          %s\n", m.shortHash(m.fromCommit))
+	fmt.Fprintf(sb, "To:            %s\n", m.shortHash(m.toCommit))
+	sb.WriteString("\n")
+	fmt.Fprintf(sb, "Commits:       %d\n", m.rangeStats.CommitCount)
+	fmt.Fprintf(sb, "Files changed: %d\n", m.rangeStats.FilesChanged)
+	fmt.Fprintf(sb, "Additions:     +%d\n", m.rangeStats.Additions)
+	fmt.Fprintf(sb, "Deletions:     -%d\n", m.rangeStats.Deletions)
+	sb.WriteString("\n[enter:proceed] [backspace:change range] [esc:quit]\n")
 }
 
 func (m Model) viewFileSelection(sb *strings.Builder) {
