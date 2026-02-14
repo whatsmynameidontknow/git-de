@@ -96,11 +96,19 @@ func (m Model) handleListItems(items []list.Item) (tea.Model, tea.Cmd) {
 			return []key.Binding{refreshBinding, checkoutBinding, backspaceBinding}
 		}
 	case stateCommitLimitSelection:
-		m.list.Title = "Select Commit History Depth"
+		if m.selectedBranch != "" {
+			m.list.Title = "Select Commit History Depth (on " + m.selectedBranch + ")"
+		} else {
+			m.list.Title = "Select Commit History Depth"
+		}
 		// Disable filtering for commit limit selection (only 6 options)
 		m.list.SetFilteringEnabled(false)
 	case stateFromCommit:
-		m.list.Title = "Select From Commit"
+		if m.selectedBranch != "" {
+			m.list.Title = "Select From Commit (on " + m.selectedBranch + ")"
+		} else {
+			m.list.Title = "Select From Commit"
+		}
 		// Add backspace key help to go back to commit limit selection
 		backspaceBinding := key.NewBinding(key.WithKeys("backspace"), key.WithHelp("backspace", "back"))
 		m.list.AdditionalShortHelpKeys = func() []key.Binding {
@@ -110,7 +118,11 @@ func (m Model) handleListItems(items []list.Item) (tea.Model, tea.Cmd) {
 			return []key.Binding{backspaceBinding}
 		}
 	default:
-		m.list.Title = "Select To Commit (after " + m.shortHash(m.fromCommit) + ")"
+		if m.selectedBranch != "" {
+			m.list.Title = "Select To Commit (on " + m.selectedBranch + ", after " + m.shortHash(m.fromCommit) + ")"
+		} else {
+			m.list.Title = "Select To Commit (after " + m.shortHash(m.fromCommit) + ")"
+		}
 		// Add backspace key help for To commit screen
 		backspaceBinding := key.NewBinding(key.WithKeys("backspace"), key.WithHelp("backspace", "back"))
 		m.list.AdditionalShortHelpKeys = func() []key.Binding {

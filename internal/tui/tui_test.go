@@ -253,6 +253,45 @@ func TestUpdate_CommitsLoaded(t *testing.T) {
 	}
 }
 
+func TestUpdate_CommitsLoaded_WithBranch(t *testing.T) {
+	m := NewModel(nil, "", "")
+	m.state = stateFromCommit
+	m.selectedBranch = "feature/auth"
+
+	items := []list.Item{
+		commitItem{sha: "abc1234567890", message: "first commit"},
+	}
+
+	updated, _ := m.Update(items)
+	model := updated.(Model)
+
+	expected := "Select From Commit (on feature/auth)"
+	if model.list.Title != expected {
+		t.Errorf("Expected list title %q, got %q", expected, model.list.Title)
+	}
+}
+
+func TestUpdate_ToCommitsLoaded_WithBranch(t *testing.T) {
+	m := NewModel(nil, "", "")
+	m.state = stateToCommit
+	m.selectedBranch = "feature/auth"
+	m.fromCommit = "abc1234567890"
+
+	items := []list.Item{
+		commitItem{sha: "def4567890123", message: "second commit"},
+	}
+
+	updated, _ := m.Update(items)
+	model := updated.(Model)
+
+	if !contains(model.list.Title, "feature/auth") {
+		t.Errorf("Expected branch name in title, got %q", model.list.Title)
+	}
+	if !contains(model.list.Title, "abc1234") {
+		t.Errorf("Expected from commit hash in title, got %q", model.list.Title)
+	}
+}
+
 func TestUpdate_LimitOptionsLoaded(t *testing.T) {
 	m := NewModel(nil, "", "")
 	m.state = stateCommitLimitSelection
