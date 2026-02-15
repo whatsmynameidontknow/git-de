@@ -1,9 +1,7 @@
 package validation
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -25,10 +23,6 @@ func ValidatePath(path string) error {
 	// Clean the path
 	path = filepath.Clean(path)
 
-	if !fs.ValidPath(path) {
-		return errors.New("invalid path")
-	}
-
 	if runtime.GOOS == "windows" {
 		return validateWindowsPath(path)
 	}
@@ -40,41 +34,59 @@ func ValidatePath(path string) error {
 const windowsInvalidChars = `<>:"|?*`
 
 func validateWindowsPath(path string) error {
-	volume := filepath.VolumeName(path)
-	if volume != "" && filepath.Dir(volume) == volume+"." {
-		fmt.Println(volume)
-		goto reserved_names_check
-	}
-	for _, char := range windowsInvalidChars {
-		if strings.ContainsRune(path, char) {
-			return fmt.Errorf("path contains invalid character: %q", char)
+	normalized := strings.ReplaceAll(path, "/", "\\")
+	for idx, char := range normalized {
+		if !strings.ContainsRune(windowsInvalidChars, char) {
+			continue
 		}
+
+		if char == ':' && idx == 1 && isASCIIAlpha(normalized[0]) {
+			continue
+		}
+
+		return fmt.Errorf("path contains invalid character: %q", char)
 	}
 
-reserved_names_check:
-	// Check for reserved names (CON, PRN, AUX, NUL, COM1-9, LPT1-9)
-	// Get the base name without extension
-	base := filepath.Base(path)
-	if idx := strings.LastIndex(base, "."); idx != -1 {
-		base = base[:idx]
-	}
-	base = strings.ToUpper(base)
+	volume := filepath.VolumeName(path)
+	remainder := strings.TrimPrefix(path, volume)
+	remainder = strings.ReplaceAll(remainder, "/", "\\")
 
-	reservedNames := []string{"CON", "PRN", "AUX", "NUL"}
-	if slices.Contains(reservedNames, base) {
-		return fmt.Errorf("%q is a reserved name on Windows", base)
-	}
+	for segment := range strings.SplitSeq(remainder, "\\") {
+		if segment == "" {
+			continue
+		}
 
-	for i := 1; i <= 9; i++ {
-		if base == fmt.Sprintf("COM%d", i) || base == fmt.Sprintf("LPT%d", i) {
+		if strings.HasSuffix(segment, " ") || strings.HasSuffix(segment, ".") {
+			return fmt.Errorf("path segment cannot end with space or period on Windows")
+		}
+
+		for _, char := range windowsInvalidChars {
+			if strings.ContainsRune(segment, char) {
+				return fmt.Errorf("path contains invalid character: %q", char)
+			}
+		}
+
+		base := segment
+		if idx := strings.Index(base, "."); idx != -1 {
+			base = base[:idx]
+		}
+		base = strings.ToUpper(base)
+
+		reservedNames := []string{"CON", "PRN", "AUX", "NUL"}
+		if slices.Contains(reservedNames, base) {
 			return fmt.Errorf("%q is a reserved name on Windows", base)
 		}
-	}
 
-	// Check for trailing spaces or periods (invalid in Windows filenames)
-	if strings.HasSuffix(path, " ") || strings.HasSuffix(path, ".") {
-		return fmt.Errorf("path cannot end with space or period on Windows")
+		for i := 1; i <= 9; i++ {
+			if base == fmt.Sprintf("COM%d", i) || base == fmt.Sprintf("LPT%d", i) {
+				return fmt.Errorf("%q is a reserved name on Windows", base)
+			}
+		}
 	}
 
 	return nil
+}
+
+func isASCIIAlpha(ch byte) bool {
+	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
 }
