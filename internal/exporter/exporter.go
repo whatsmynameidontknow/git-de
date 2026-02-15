@@ -19,13 +19,13 @@ import (
 	"github.com/whatsmynameidontknow/git-de/internal/manifest"
 )
 
-type GitClient interface {
-	GetChangedFiles(from, to string) ([]git.FileChange, error)
-	ValidateCommit(commit string) error
-	GetFileContent(commit, path string) ([]byte, error)
-	IsGitRepository() bool
-	HasCommits() bool
-	IsFileOutsideRepo(path string) bool
+type GitExporter interface {
+	GetChangedFiles(from, to string) (changedFile []git.FileChange, err error)
+	ValidateCommit(commit string) (err error)
+	GetFileContent(commit, path string) (content []byte, err error)
+	IsGitRepository() (ok bool)
+	HasCommits() (ok bool)
+	IsFileOutsideRepo(path string) (ok bool)
 }
 
 type Options struct {
@@ -45,11 +45,11 @@ type Options struct {
 type Exporter struct {
 	errors []error
 	mu     *sync.RWMutex
-	client GitClient
+	client GitExporter
 	opts   Options
 }
 
-func New(client GitClient, opts Options) *Exporter {
+func New(client GitExporter, opts Options) *Exporter {
 	return &Exporter{
 		client: client,
 		opts:   opts,

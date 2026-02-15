@@ -248,12 +248,12 @@ func (m Model) handleKeyLimitSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.loadCommitsCmd
 		}
 	}
-	if msg.String() == "backspace" && !m.list.SettingFilter() {
-		if m.selectedBranch != "" {
-			m.state = stateBranchSelection
-			return m, m.loadBranchesCmd
-		}
-	}
+	// if msg.String() == "backspace" && !m.list.SettingFilter() {
+	// 	if m.selectedBranch != "" {
+	// 		m.state = stateBranchSelection
+	// 		return m, m.loadBranchesCmd
+	// 	}
+	// }
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
 	return m, cmd

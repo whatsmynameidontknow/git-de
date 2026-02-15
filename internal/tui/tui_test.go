@@ -10,10 +10,36 @@ import (
 	"github.com/whatsmynameidontknow/git-de/internal/git"
 )
 
+type gitClientMock struct{}
+
+func (g gitClientMock) GetCurrentBranch() (branch string, err error)                   { return }
+func (g gitClientMock) GetBranchesWithAheadBehind() (branches []git.Branch, err error) { return }
+func (g gitClientMock) GetRecentCommitsOnBranch(branch string, n int) (commits []git.Commit, err error) {
+	return
+}
+
+func (g gitClientMock) GetCommitRangeStats(from, to string) (stats git.CommitRangeStats, err error) {
+	return
+}
+func (g gitClientMock) GetRecentCommits(n int) (commits []git.Commit, err error)             { return }
+func (g gitClientMock) GetCommitsAfter(from string, n int) (commits []git.Commit, err error) { return }
+func (g gitClientMock) GetChangedFiles(from, to string) (changedFiles []git.FileChange, err error) {
+	return
+}
+func (g gitClientMock) ValidateCommit(commit string) (err error)                       { return }
+func (g gitClientMock) GetFileContent(commit, path string) (content []byte, err error) { return }
+func (g gitClientMock) IsGitRepository() (ok bool)                                     { return }
+func (g gitClientMock) HasCommits() (ok bool)                                          { return }
+func (g gitClientMock) IsFileOutsideRepo(path string) (ok bool)                        { return }
+func (g gitClientMock) CheckoutBranch(branch string) (err error)                       { return }
+
 func TestNewModel_NoCommits(t *testing.T) {
-	m := NewModel(nil, "", "")
-	if m.state != stateBranchSelection {
-		t.Errorf("Expected state stateBranchSelection, got %d", m.state)
+	m, err := NewModel(&gitClientMock{}, "", "")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
+	if m.state != stateCommitLimitSelection {
+		t.Errorf("Expected state stateCommmitLimitSelection, got %d", m.state)
 	}
 	if m.fromCommit != "" {
 		t.Errorf("Expected empty fromCommit, got %s", m.fromCommit)
@@ -24,7 +50,10 @@ func TestNewModel_NoCommits(t *testing.T) {
 }
 
 func TestNewModel_WithFromCommit(t *testing.T) {
-	m := NewModel(nil, "abc123", "")
+	m, err := NewModel(&gitClientMock{}, "abc123", "")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	if m.state != stateToCommit {
 		t.Errorf("Expected state stateToCommit, got %d", m.state)
 	}
@@ -34,7 +63,10 @@ func TestNewModel_WithFromCommit(t *testing.T) {
 }
 
 func TestNewModel_WithBothCommits(t *testing.T) {
-	m := NewModel(nil, "abc123", "def456")
+	m, err := NewModel(&gitClientMock{}, "abc123", "def456")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	if m.state != stateCommitRangeSummary {
 		t.Errorf("Expected state stateCommitRangeSummary, got %d", m.state)
 	}
@@ -47,8 +79,10 @@ func TestNewModel_WithBothCommits(t *testing.T) {
 }
 
 func TestUpdate_EarlyKeyPressDoesNotPanic(t *testing.T) {
-	m := NewModel(nil, "", "")
-
+	m, err := NewModel(&gitClientMock{}, "", "")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			t.Fatalf("Update panicked on early key press: %v", r)
@@ -58,13 +92,16 @@ func TestUpdate_EarlyKeyPressDoesNotPanic(t *testing.T) {
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	model := updated.(Model)
 
-	if model.state != stateBranchSelection {
-		t.Errorf("Expected state stateBranchSelection, got %d", model.state)
+	if model.state != stateCommitLimitSelection {
+		t.Errorf("Expected state stateCommitLimitSelection, got %d", model.state)
 	}
 }
 
 func TestUpdate_FilesLoaded(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 
 	files := []fileItem{
 		{path: "main.go", status: git.StatusAdded, selected: true, disabled: false},
@@ -87,7 +124,10 @@ func TestUpdate_FilesLoaded(t *testing.T) {
 }
 
 func TestUpdate_FileSelection_Toggle(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateFileSelection
 	m.files = []fileItem{
 		{path: "main.go", status: git.StatusAdded, selected: true, disabled: false},
@@ -113,7 +153,10 @@ func TestUpdate_FileSelection_Toggle(t *testing.T) {
 }
 
 func TestUpdate_FileSelection_ToggleDisabled(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateFileSelection
 	m.files = []fileItem{
 		{path: "old.go", status: git.StatusDeleted, selected: false, disabled: true},
@@ -129,7 +172,10 @@ func TestUpdate_FileSelection_ToggleDisabled(t *testing.T) {
 }
 
 func TestUpdate_FileSelection_SelectAll(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateFileSelection
 	m.files = []fileItem{
 		{path: "main.go", status: git.StatusAdded, selected: false, disabled: false},
@@ -152,7 +198,10 @@ func TestUpdate_FileSelection_SelectAll(t *testing.T) {
 }
 
 func TestUpdate_FileSelection_SelectNone(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateFileSelection
 	m.files = []fileItem{
 		{path: "main.go", status: git.StatusAdded, selected: true, disabled: false},
@@ -171,7 +220,10 @@ func TestUpdate_FileSelection_SelectNone(t *testing.T) {
 }
 
 func TestUpdate_FileSelection_Navigation(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateFileSelection
 	m.files = []fileItem{
 		{path: "a.go", status: git.StatusAdded, selected: true},
@@ -210,7 +262,10 @@ func TestUpdate_FileSelection_Navigation(t *testing.T) {
 }
 
 func TestUpdate_FileSelection_EnterGoesToOutputPath(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateFileSelection
 	m.files = []fileItem{
 		{path: "main.go", status: git.StatusAdded, selected: true},
@@ -225,7 +280,10 @@ func TestUpdate_FileSelection_EnterGoesToOutputPath(t *testing.T) {
 }
 
 func TestUpdate_Confirm_BackGoesToOutputPath(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateConfirm
 	m.outputPath = "./export"
 
@@ -238,7 +296,10 @@ func TestUpdate_Confirm_BackGoesToOutputPath(t *testing.T) {
 }
 
 func TestUpdate_CommitsLoaded(t *testing.T) {
-	m := NewModel(nil, "", "")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateFromCommit
 
 	items := []list.Item{
@@ -255,7 +316,10 @@ func TestUpdate_CommitsLoaded(t *testing.T) {
 }
 
 func TestUpdate_CommitsLoaded_WithBranch(t *testing.T) {
-	m := NewModel(nil, "", "")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateFromCommit
 	m.selectedBranch = "feature/auth"
 
@@ -273,7 +337,10 @@ func TestUpdate_CommitsLoaded_WithBranch(t *testing.T) {
 }
 
 func TestUpdate_ToCommitsLoaded_WithBranch(t *testing.T) {
-	m := NewModel(nil, "", "")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateToCommit
 	m.selectedBranch = "feature/auth"
 	m.fromCommit = "abc1234567890"
@@ -294,7 +361,10 @@ func TestUpdate_ToCommitsLoaded_WithBranch(t *testing.T) {
 }
 
 func TestUpdate_LimitOptionsLoaded(t *testing.T) {
-	m := NewModel(nil, "", "")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateCommitLimitSelection
 
 	items := []list.Item{
@@ -310,7 +380,10 @@ func TestUpdate_LimitOptionsLoaded(t *testing.T) {
 }
 
 func TestUpdate_ErrorHandling(t *testing.T) {
-	m := NewModel(nil, "", "")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 
 	updated, _ := m.Update(fmt.Errorf("something went wrong"))
 	model := updated.(Model)
@@ -324,7 +397,10 @@ func TestUpdate_ErrorHandling(t *testing.T) {
 }
 
 func TestUpdate_ProgressComplete(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateProgress
 	m.totalFiles = 6
 
@@ -340,7 +416,10 @@ func TestUpdate_ProgressComplete(t *testing.T) {
 }
 
 func TestView_FileSelection(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateFileSelection
 	m.files = []fileItem{
 		{path: "main.go", status: git.StatusAdded, selected: true},
@@ -365,7 +444,10 @@ func TestView_FileSelection(t *testing.T) {
 }
 
 func TestView_Confirm(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateConfirm
 	m.outputPath = "./my-export"
 	m.files = []fileItem{
@@ -385,7 +467,10 @@ func TestView_Confirm(t *testing.T) {
 }
 
 func TestView_Done(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateDone
 	m.totalFiles = 20
 	m.successCount = 15
@@ -497,7 +582,10 @@ func TestValidateCommitLimit(t *testing.T) {
 }
 
 func TestUpdate_LimitSelection_Predefined(t *testing.T) {
-	m := NewModel(nil, "", "")
+	m, err := NewModel(&gitClientMock{}, "", "")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateCommitLimitSelection
 
 	// Load limit options into the list
@@ -524,7 +612,10 @@ func TestUpdate_LimitSelection_Predefined(t *testing.T) {
 }
 
 func TestUpdate_LimitSelection_Custom(t *testing.T) {
-	m := NewModel(nil, "", "")
+	m, err := NewModel(&gitClientMock{}, "", "")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateCommitLimitSelection
 
 	// Load limit options into the list
@@ -551,7 +642,10 @@ func TestUpdate_LimitSelection_Custom(t *testing.T) {
 }
 
 func TestUpdate_LimitCustom_EscapeGoesBack(t *testing.T) {
-	m := NewModel(nil, "", "")
+	m, err := NewModel(&gitClientMock{}, "", "")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateCommitLimitCustom
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
@@ -566,7 +660,10 @@ func TestUpdate_LimitCustom_EscapeGoesBack(t *testing.T) {
 }
 
 func TestView_LimitCustom(t *testing.T) {
-	m := NewModel(nil, "", "")
+	m, err := NewModel(&gitClientMock{}, "", "")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateCommitLimitCustom
 
 	view := m.View()
@@ -584,7 +681,10 @@ func TestView_LimitCustom(t *testing.T) {
 
 func TestUpdate_ShortCommitHashDoesNotPanic(t *testing.T) {
 	// Create a model with a short commit hash (length < 7)
-	m := NewModel(nil, "HEAD~5", "")
+	m, err := NewModel(&gitClientMock{}, "HEAD~5", "")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -607,10 +707,10 @@ func TestInit_States(t *testing.T) {
 		expectedState sessionState
 	}{
 		{
-			name:          "no args starts with branch selection",
+			name:          "no args starts with commit limit selection",
 			from:          "",
 			to:            "",
-			expectedState: stateBranchSelection,
+			expectedState: stateCommitLimitSelection,
 		},
 		{
 			name:          "from arg starts with to-commit selection screen",
@@ -628,7 +728,10 @@ func TestInit_States(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := NewModel(nil, tt.from, tt.to)
+			m, err := NewModel(&gitClientMock{}, tt.from, tt.to)
+			if err != nil {
+				t.Errorf("Expected error to be nil, got %s", err)
+			}
 			if m.state != tt.expectedState {
 				t.Errorf("Expected state %d, got %d", tt.expectedState, m.state)
 			}
@@ -637,7 +740,10 @@ func TestInit_States(t *testing.T) {
 }
 
 func TestView_FileSelection_ShowsCommits(t *testing.T) {
-	m := NewModel(nil, "abc1234567", "def4567890")
+	m, err := NewModel(&gitClientMock{}, "abc1234567", "def4567890")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateFileSelection
 	m.files = []fileItem{
 		{path: "main.go", status: git.StatusAdded, selected: true},
@@ -654,7 +760,10 @@ func TestView_FileSelection_ShowsCommits(t *testing.T) {
 }
 
 func TestView_FileSelection_ShowsSelectedCount(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateFileSelection
 	m.files = []fileItem{
 		{path: "main.go", status: git.StatusAdded, selected: true},
@@ -672,8 +781,11 @@ func TestView_FileSelection_ShowsSelectedCount(t *testing.T) {
 // --- Branch Selection Tests ---
 
 func TestUpdate_BranchesLoaded(t *testing.T) {
-	m := NewModel(nil, "", "")
-	// state is stateBranchSelection by default
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
+	m.state = stateBranchSelection
 
 	items := []list.Item{
 		branchItem{branch: git.Branch{Name: "main", IsCurrent: true, LastMessage: "initial"}},
@@ -689,7 +801,11 @@ func TestUpdate_BranchesLoaded(t *testing.T) {
 }
 
 func TestUpdate_BranchSelection_EnterSelectsBranch(t *testing.T) {
-	m := NewModel(nil, "", "")
+	m, err := NewModel(&gitClientMock{}, "", "")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
+	m.state = stateBranchSelection
 
 	// Load branches
 	items := []list.Item{
@@ -789,7 +905,10 @@ func TestBranchItem_FilterValue(t *testing.T) {
 }
 
 func TestView_CommitRangeSummary(t *testing.T) {
-	m := NewModel(nil, "abc1234567", "def4567890")
+	m, err := NewModel(gitClientMock{}, "abc1234567", "def4567890")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateCommitRangeSummary
 	m.selectedBranch = "feature/auth"
 	m.rangeStats = git.CommitRangeStats{
@@ -825,7 +944,10 @@ func TestView_CommitRangeSummary(t *testing.T) {
 }
 
 func TestUpdate_CommitRangeSummary_EnterProceedsToFileSelection(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateCommitRangeSummary
 	m.rangeStats = git.CommitRangeStats{CommitCount: 5}
 
@@ -840,7 +962,10 @@ func TestUpdate_CommitRangeSummary_EnterProceedsToFileSelection(t *testing.T) {
 }
 
 func TestNewModel_WithBothCommits_AutoDetectsBranch(t *testing.T) {
-	m := NewModel(nil, "abc123", "def456")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	// selectedBranch should be empty since we don't have a git client here
 	// but Init should attempt to detect it
 	if m.state != stateCommitRangeSummary {
@@ -849,7 +974,10 @@ func TestNewModel_WithBothCommits_AutoDetectsBranch(t *testing.T) {
 }
 
 func TestUpdate_CommitRangeSummary_BackspaceGoesToToCommit(t *testing.T) {
-	m := NewModel(nil, "abc", "def")
+	m, err := NewModel(&gitClientMock{}, "abc", "def")
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %s", err)
+	}
 	m.state = stateCommitRangeSummary
 	m.rangeStats = git.CommitRangeStats{CommitCount: 5}
 

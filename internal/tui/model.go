@@ -10,13 +10,14 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/whatsmynameidontknow/git-de/internal/exporter"
 	"github.com/whatsmynameidontknow/git-de/internal/git"
 )
 
 // Model is the top-level Bubble Tea model for the TUI.
 type Model struct {
 	state     sessionState
-	gitClient *git.Client
+	gitClient gitClient
 	err       error
 
 	// Branch selection
@@ -61,8 +62,19 @@ type Model struct {
 	progressCh   <-chan progressMsg
 }
 
+type gitClient interface {
+	GetCurrentBranch() (branch string, err error)
+	GetBranchesWithAheadBehind() (branches []git.Branch, err error)
+	GetRecentCommitsOnBranch(branch string, n int) (commits []git.Commit, err error)
+	GetCommitRangeStats(from, to string) (stats git.CommitRangeStats, err error)
+	GetRecentCommits(n int) (commits []git.Commit, err error)
+	GetCommitsAfter(from string, n int) (commits []git.Commit, err error)
+	exporter.GitExporter
+	CheckoutBranch(branch string) (err error)
+}
+
 // NewModel creates a new TUI model with optional pre-filled commit range.
-func NewModel(client *git.Client, from, to string) Model {
+func NewModel(client gitClient, from, to string) (Model, error) {
 	ti := textinput.New()
 	ti.Placeholder = defaultOutputPath
 	ti.SetValue(defaultOutputPath)
@@ -92,35 +104,31 @@ func NewModel(client *git.Client, from, to string) Model {
 		toCommit:    to,
 		commitLimit: defaultCommitLimit,
 	}
+	branch, err := client.GetCurrentBranch()
+	if err != nil {
+		return Model{}, err
+	}
+	m.selectedBranch = branch
 
 	if from != "" && to != "" {
 		m.state = stateCommitRangeSummary
-		// Auto-detect current branch
-		if client != nil {
-			if branch, err := client.GetCurrentBranch(); err == nil {
-				m.selectedBranch = branch
-			}
-		}
 	} else if from != "" {
 		m.state = stateToCommit
-		// Auto-detect current branch
-		if client != nil {
-			if branch, err := client.GetCurrentBranch(); err == nil {
-				m.selectedBranch = branch
-			}
-		}
 	} else {
-		m.state = stateBranchSelection
+		m.state = stateCommitLimitSelection
 	}
 
-	return m
+	return m, nil
 }
 
 // Run starts the TUI program.
 func Run(client *git.Client, from, to string) error {
-	m := NewModel(client, from, to)
+	m, err := NewModel(client, from, to)
+	if err != nil {
+		return err
+	}
 	p := tea.NewProgram(m)
-	_, err := p.Run()
+	_, err = p.Run()
 	return err
 }
 
