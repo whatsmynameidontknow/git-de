@@ -3,9 +3,9 @@ package tui
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
-
-	"github.com/charmbracelet/lipgloss"
 )
 
 // View renders the current TUI state.
@@ -70,10 +70,10 @@ func (m Model) viewCommitRangeSummary(sb *strings.Builder) {
 	fmt.Fprintf(sb, "From:          %s\n", m.shortHash(m.fromCommit))
 	fmt.Fprintf(sb, "To:            %s\n", m.shortHash(m.toCommit))
 	sb.WriteString("\n")
-	fmt.Fprintf(sb, "Commits:       %d\n", m.rangeStats.CommitCount)
-	fmt.Fprintf(sb, "Files changed: %d\n", m.rangeStats.FilesChanged)
-	fmt.Fprintf(sb, "Additions:     +%d\n", m.rangeStats.Additions)
-	fmt.Fprintf(sb, "Deletions:     -%d\n", m.rangeStats.Deletions)
+	fmt.Fprintf(sb, "Commits:       %s\n", totalStyle.Render(strconv.Itoa(m.rangeStats.CommitCount)))
+	fmt.Fprintf(sb, "Files changed: %s\n", totalStyle.Render(strconv.Itoa(m.rangeStats.FilesChanged)))
+	fmt.Fprintf(sb, "Additions:     %s\n", successStyle.Render(fmt.Sprintf("+%d", m.rangeStats.Additions)))
+	fmt.Fprintf(sb, "Deletions:     %s\n", errorStyle.Render(fmt.Sprintf("-%d", m.rangeStats.Deletions)))
 	sb.WriteString("\n[enter:proceed] [backspace:change range] [esc:quit]\n")
 }
 
@@ -181,20 +181,26 @@ func (m Model) viewConfirm(sb *strings.Builder) {
 	fmt.Fprintf(sb, "Export %d files to %s?\n\n", m.selectedFileCount(), m.outputPath)
 
 	if _, err := os.Stat(m.outputPath); err == nil {
-		sb.WriteString(errorStyle.Render("⚠ Warning: Directory exists and will be overwritten!") + "\n\n")
+		sb.WriteString(warningStyle.Render("⚠ Warning: Directory exists and will be overwritten!") + "\n\n")
 	}
 
 	sb.WriteString("[Y:confirm] [N/backspace:back] [esc:quit]\n")
 }
 
 func (m Model) viewProgress(sb *strings.Builder) {
-	fmt.Fprintf(sb, "Exporting... (%d/%d)\n", m.doneFiles, m.totalFiles)
+	fmt.Fprintf(sb, "Exporting %d/%d... (%s)\n", m.successCount, m.totalFiles, errorStyle.Render(fmt.Sprintf("%d failed", m.failedCount)))
 	sb.WriteString(m.progress.View() + "\n")
 	sb.WriteString(statusStyle.Render("Current: "+m.currentFile) + "\n")
 }
 
 func (m Model) viewDone(sb *strings.Builder) {
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Render("✓ Export Complete!") + "\n")
+	sb.WriteString("Summary:\n")
+	fmt.Fprint(sb, totalStyle.Render(fmt.Sprintf("- Total Files:\t%d files", m.totalFiles))+"\n")
+	fmt.Fprint(sb, successStyle.Render(fmt.Sprintf("- Success Count:\t%d files", m.successCount))+"\n")
+	fmt.Fprint(sb, errorStyle.Render(fmt.Sprintf("- Failed Count:\t%d files", m.failedCount))+"\n")
 	fmt.Fprintf(sb, "Saved to: %s\n", m.outputPath)
+	if m.failedCount > 0 {
+		fmt.Fprintf(sb, "List of failed files saved to: %s\n", filepath.Join(m.outputPath, "errors.txt"))
+	}
 	sb.WriteString("\nPress any key to exit\n")
 }

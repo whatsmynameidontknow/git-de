@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -284,10 +285,10 @@ func TestUpdate_ToCommitsLoaded_WithBranch(t *testing.T) {
 	updated, _ := m.Update(items)
 	model := updated.(Model)
 
-	if !contains(model.list.Title, "feature/auth") {
+	if !strings.Contains(model.list.Title, "feature/auth") {
 		t.Errorf("Expected branch name in title, got %q", model.list.Title)
 	}
-	if !contains(model.list.Title, "abc1234") {
+	if !strings.Contains(model.list.Title, "abc1234") {
 		t.Errorf("Expected from commit hash in title, got %q", model.list.Title)
 	}
 }
@@ -325,15 +326,16 @@ func TestUpdate_ErrorHandling(t *testing.T) {
 func TestUpdate_ProgressComplete(t *testing.T) {
 	m := NewModel(nil, "abc", "def")
 	m.state = stateProgress
+	m.totalFiles = 6
 
-	updated, _ := m.Update(progressMsg{current: 5, total: 5, file: "Done"})
+	updated, _ := m.Update(progressMsg{successCount: 5, failedCount: 1, file: "Done"})
 	model := updated.(Model)
 
 	if model.state != stateDone {
 		t.Errorf("Expected state stateDone, got %d", model.state)
 	}
-	if model.doneFiles != 5 {
-		t.Errorf("Expected doneFiles 5, got %d", model.doneFiles)
+	if model.successCount != 5 {
+		t.Errorf("Expected doneFiles 5, got %d", model.successCount)
 	}
 }
 
@@ -348,16 +350,16 @@ func TestView_FileSelection(t *testing.T) {
 
 	view := m.View()
 
-	if !contains(view, "Select Files") {
+	if !strings.Contains(view, "Select Files") {
 		t.Error("Expected 'Select Files' in view")
 	}
-	if !contains(view, "main.go") {
+	if !strings.Contains(view, "main.go") {
 		t.Error("Expected 'main.go' in view")
 	}
-	if !contains(view, "old.go") {
+	if !strings.Contains(view, "old.go") {
 		t.Error("Expected 'old.go' in view")
 	}
-	if !contains(view, "[space:toggle]") {
+	if !strings.Contains(view, "[space:toggle]") {
 		t.Error("Expected keyboard shortcuts in view")
 	}
 }
@@ -374,10 +376,10 @@ func TestView_Confirm(t *testing.T) {
 
 	view := m.View()
 
-	if !contains(view, "Export 2 files") {
+	if !strings.Contains(view, "Export 2 files") {
 		t.Error("Expected 'Export 2 files' in view (only non-disabled selected)")
 	}
-	if !contains(view, "./my-export") {
+	if !strings.Contains(view, "./my-export") {
 		t.Error("Expected output path in view")
 	}
 }
@@ -385,15 +387,27 @@ func TestView_Confirm(t *testing.T) {
 func TestView_Done(t *testing.T) {
 	m := NewModel(nil, "abc", "def")
 	m.state = stateDone
+	m.totalFiles = 20
+	m.successCount = 15
+	m.failedCount = 5
 	m.outputPath = "./export"
 
 	view := m.View()
 
-	if !contains(view, "Export Complete") {
-		t.Error("Expected 'Export Complete' in view")
+	if !strings.Contains(view, "Summary") {
+		t.Error("Expected 'Summary' in view")
 	}
-	if !contains(view, "./export") {
+	if !strings.Contains(view, "./export") {
 		t.Error("Expected output path in view")
+	}
+	if !strings.Contains(view, totalStyle.Render("Total Files:\t20 files")) {
+		t.Error("Expected number of total files in view to be 20")
+	}
+	if !strings.Contains(view, successStyle.Render("Success Count:\t15 files")) {
+		t.Error("Expected number of success count in view to be 15")
+	}
+	if !strings.Contains(view, errorStyle.Render("Failed Count:\t5 files")) {
+		t.Error("Expected number of failed count in view to be 5")
 	}
 }
 
@@ -428,7 +442,7 @@ func TestFileItem_Title(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			title := tt.item.Title()
-			if !contains(title, tt.contains) {
+			if !strings.Contains(title, tt.contains) {
 				t.Errorf("Title() = %q, expected to contain %q", title, tt.contains)
 			}
 		})
@@ -557,13 +571,13 @@ func TestView_LimitCustom(t *testing.T) {
 
 	view := m.View()
 
-	if !contains(view, "Enter Custom Commit Limit") {
+	if !strings.Contains(view, "Enter Custom Commit Limit") {
 		t.Error("Expected 'Enter Custom Commit Limit' in view")
 	}
-	if !contains(view, "1 and 999999") {
+	if !strings.Contains(view, "1 and 999999") {
 		t.Error("Expected range hint in view")
 	}
-	if !contains(view, "[esc:back]") {
+	if !strings.Contains(view, "[esc:back]") {
 		t.Error("Expected escape hint in view")
 	}
 }
@@ -631,10 +645,10 @@ func TestView_FileSelection_ShowsCommits(t *testing.T) {
 
 	view := m.View()
 
-	if !contains(view, "abc1234") {
+	if !strings.Contains(view, "abc1234") {
 		t.Error("Expected from commit hash in view")
 	}
-	if !contains(view, "def4567") {
+	if !strings.Contains(view, "def4567") {
 		t.Error("Expected to commit hash in view")
 	}
 }
@@ -650,7 +664,7 @@ func TestView_FileSelection_ShowsSelectedCount(t *testing.T) {
 
 	view := m.View()
 
-	if !contains(view, "2 selected") {
+	if !strings.Contains(view, "2 selected") {
 		t.Error("Expected '2 selected' in view")
 	}
 }
@@ -760,7 +774,7 @@ func TestBranchItem_Description(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			item := branchItem{branch: tt.branch}
 			desc := item.Description()
-			if !contains(desc, tt.contains) {
+			if !strings.Contains(desc, tt.contains) {
 				t.Errorf("Description() = %q, expected to contain %q", desc, tt.contains)
 			}
 		})
@@ -787,25 +801,25 @@ func TestView_CommitRangeSummary(t *testing.T) {
 
 	view := m.View()
 
-	if !contains(view, "feature/auth") {
+	if !strings.Contains(view, "feature/auth") {
 		t.Error("Expected branch name in view")
 	}
-	if !contains(view, "abc1234") {
+	if !strings.Contains(view, "abc1234") {
 		t.Error("Expected from commit in view")
 	}
-	if !contains(view, "def4567") {
+	if !strings.Contains(view, "def4567") {
 		t.Error("Expected to commit in view")
 	}
-	if !contains(view, "12") {
+	if !strings.Contains(view, "12") {
 		t.Error("Expected commit count in view")
 	}
-	if !contains(view, "47") {
+	if !strings.Contains(view, "47") {
 		t.Error("Expected files changed in view")
 	}
-	if !contains(view, "+1234") {
+	if !strings.Contains(view, "+1234") {
 		t.Error("Expected additions in view")
 	}
-	if !contains(view, "-567") {
+	if !strings.Contains(view, "-567") {
 		t.Error("Expected deletions in view")
 	}
 }
@@ -848,17 +862,4 @@ func TestUpdate_CommitRangeSummary_BackspaceGoesToToCommit(t *testing.T) {
 	if cmd == nil {
 		t.Error("Expected loadToCommitsCmd to be returned")
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && searchString(s, substr)
-}
-
-func searchString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

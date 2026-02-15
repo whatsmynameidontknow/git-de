@@ -124,11 +124,6 @@ func (c *Client) parseLine(line string) (FileChange, error) {
 			OldPath: fields[1],
 			Path:    fields[2],
 		}, nil
-	case StatusAdded, StatusModified, StatusDeleted:
-		return FileChange{
-			Status: status,
-			Path:   fields[1],
-		}, nil
 	default:
 		return FileChange{
 			Status: status,

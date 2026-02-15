@@ -4,16 +4,18 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/whatsmynameidontknow/git-de/internal/git"
 )
 
 type mockGitClient struct {
-	commits    map[string]bool
-	changes    []git.FileChange
+	commits     map[string]bool
+	changes     []git.FileChange
 	fileContent map[string][]byte
 }
 
@@ -36,8 +38,8 @@ func (m *mockGitClient) GetFileContent(commit, path string) ([]byte, error) {
 	return content, nil
 }
 
-func (m *mockGitClient) IsGitRepository() bool { return true }
-func (m *mockGitClient) HasCommits() bool       { return true }
+func (m *mockGitClient) IsGitRepository() bool              { return true }
+func (m *mockGitClient) HasCommits() bool                   { return true }
 func (m *mockGitClient) IsFileOutsideRepo(path string) bool { return false }
 
 func TestExporter_Export(t *testing.T) {
@@ -62,7 +64,7 @@ func TestExporter_Export(t *testing.T) {
 				{Status: "M", Path: "modified.go"},
 			},
 			files: map[string][]byte{
-				"new.go":     []byte("package main"),
+				"new.go":      []byte("package main"),
 				"modified.go": []byte("func main() {}"),
 			},
 			wantErr:   false,
@@ -84,7 +86,7 @@ func TestExporter_Export(t *testing.T) {
 				"src/utils/helper.go": []byte("package utils"),
 				"cmd/app/main.go":     []byte("package main"),
 			},
-			wantErr: false,
+			wantErr:   false,
 			wantFiles: []string{"src/utils/helper.go", "cmd/app/main.go"},
 		},
 		{
@@ -263,12 +265,12 @@ func TestExporter_Export(t *testing.T) {
 
 func TestExporter_OutputDirExists(t *testing.T) {
 	outputDir := t.TempDir() + "/existing"
-	os.MkdirAll(outputDir, 0755)
-	os.WriteFile(filepath.Join(outputDir, "old.txt"), []byte("old"), 0644)
+	os.MkdirAll(outputDir, 0o755)
+	os.WriteFile(filepath.Join(outputDir, "old.txt"), []byte("old"), 0o644)
 
 	mock := &mockGitClient{
-		commits: map[string]bool{"v1.0.0": true, "v2.0.0": true},
-		changes: []git.FileChange{{Status: "A", Path: "new.go"}},
+		commits:     map[string]bool{"v1.0.0": true, "v2.0.0": true},
+		changes:     []git.FileChange{{Status: "A", Path: "new.go"}},
 		fileContent: map[string][]byte{"new.go": []byte("new")},
 	}
 
@@ -289,12 +291,12 @@ func TestExporter_OutputDirExists(t *testing.T) {
 
 func TestExporter_Overwrite(t *testing.T) {
 	outputDir := t.TempDir() + "/existing"
-	os.MkdirAll(outputDir, 0755)
-	os.WriteFile(filepath.Join(outputDir, "old.txt"), []byte("old"), 0644)
+	os.MkdirAll(outputDir, 0o755)
+	os.WriteFile(filepath.Join(outputDir, "old.txt"), []byte("old"), 0o644)
 
 	mock := &mockGitClient{
-		commits: map[string]bool{"v1.0.0": true, "v2.0.0": true},
-		changes: []git.FileChange{{Status: "A", Path: "new.go"}},
+		commits:     map[string]bool{"v1.0.0": true, "v2.0.0": true},
+		changes:     []git.FileChange{{Status: "A", Path: "new.go"}},
 		fileContent: map[string][]byte{"new.go": []byte("new")},
 	}
 
@@ -307,7 +309,6 @@ func TestExporter_Overwrite(t *testing.T) {
 
 	exp := New(mock, opts)
 	err := exp.Export()
-
 	if err != nil {
 		t.Fatalf("Export() failed: %v", err)
 	}
@@ -382,6 +383,57 @@ func TestExporter_ArchiveZip(t *testing.T) {
 	}
 }
 
+func TestExporter_Error(t *testing.T) {
+	mock := mockGitClient{
+		commits: map[string]bool{"v1.0.0": true, "v2.0.0": true},
+		changes: []git.FileChange{
+			{Status: "A", Path: "main.go"},
+		},
+		fileContent: map[string][]byte{
+			"main.go": []byte("package main"),
+		},
+	}
+	opts := Options{
+		FromCommit: "v1.0.0",
+		ToCommit:   "v2.0.0",
+	}
+
+	exp := New(&mock, opts)
+	errors := []error{
+		errors.New("main.og: exit status 128"),
+		errors.New("main.gg: exit status 128"),
+		errors.New("main.oo: exit status 128"),
+	}
+	hasErrors := exp.HasErrors()
+	if hasErrors {
+		t.Error("expected hasErrors to be false")
+	}
+	errCount := exp.ErrorCount()
+	if errCount != 0 {
+		t.Errorf("expected error count to be 0, got %d", errCount)
+	}
+	for _, err := range errors {
+		exp.AddError(err)
+	}
+	hasErrors = exp.HasErrors()
+	if !hasErrors {
+		t.Errorf("expected hasErrors to be true")
+	}
+	errCount = exp.ErrorCount()
+	if errCount != 3 {
+		t.Errorf("expected error count to be 3, got %d", errCount)
+	}
+
+	var sb strings.Builder
+	exp.WriteError(&sb)
+	lines := strings.Split(sb.String(), "\n")
+	for i, line := range lines {
+		if line != errors[i].Error() {
+			t.Errorf("expected line[%d] to be %s, got %s", i+1, errors[i].Error(), line)
+		}
+	}
+}
+
 func TestExporter_ArchiveTarGz(t *testing.T) {
 	archivePath := filepath.Join(t.TempDir(), "export.tar.gz")
 
@@ -443,7 +495,6 @@ func TestExporter_ArchiveTarGz(t *testing.T) {
 		t.Error("Expected main.go in tar.gz")
 	}
 	if !fileNames["summary.txt"] {
-
 		t.Error("Expected summary.txt in tar.gz")
 	}
 }

@@ -29,6 +29,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case exportStartedMsg:
 		m.progressCh = msg.ch
+		m.totalFiles = msg.fileCount
 		return m, waitForProgress(msg.ch)
 
 	case progressMsg:
@@ -147,16 +148,17 @@ func (m Model) handleFileItems(files []fileItem) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleProgress(msg progressMsg) (tea.Model, tea.Cmd) {
-	m.doneFiles = msg.current
-	m.totalFiles = msg.total
+	currentProcessed := msg.failedCount + msg.successCount
+	m.successCount = msg.successCount
+	m.failedCount = msg.failedCount
 	m.currentFile = msg.file
 
 	percent := 1.0
-	if msg.total > 0 {
-		percent = float64(msg.current) / float64(msg.total)
+	if m.totalFiles > 0 {
+		percent = float64(currentProcessed) / float64(m.totalFiles)
 	}
 
-	if msg.total > 0 && msg.current >= msg.total {
+	if m.totalFiles > 0 && currentProcessed >= m.totalFiles {
 		m.state = stateDone
 		return m, m.progress.SetPercent(1)
 	}

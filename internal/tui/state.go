@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -21,9 +23,12 @@ const (
 )
 
 const (
-	defaultOutputPath  = "./export"
-	defaultCommitLimit = 50
-	commitLimitAll     = 999999
+	defaultOutputPath   = "./export"
+	defaultCommitLimit  = 50
+	commitLimitAll      = 999999
+	numWorkers          = 5
+	bufferSize          = 20
+	concurrentThreshold = 100
 )
 
 var (
@@ -44,18 +49,31 @@ var (
 	selectedStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#AD58B4")).
 			Bold(true)
+	warningStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00"))
+	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00"))
+	totalStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#0000FF"))
 )
 
 // Messages
 
 type progressMsg struct {
-	file    string
-	current int
-	total   int
+	file         string
+	successCount int
+	failedCount  int
 }
 
 type exportStartedMsg struct {
-	ch <-chan progressMsg
+	ch        <-chan progressMsg
+	fileCount int
 }
 
 type exportDoneMsg struct{}
+
+type copyError struct {
+	msg  error
+	path string
+}
+
+func (c copyError) Error() string {
+	return fmt.Sprintf("%s: %s", c.path, c.msg)
+}

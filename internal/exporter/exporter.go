@@ -5,10 +5,15 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"fmt"
+	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 
 	"github.com/whatsmynameidontknow/git-de/internal/git"
 	"github.com/whatsmynameidontknow/git-de/internal/manifest"
@@ -38,15 +43,18 @@ type Options struct {
 }
 
 type Exporter struct {
+	errors []error
+	mu     *sync.RWMutex
 	client GitClient
 	opts   Options
 }
 
 func New(client GitClient, opts Options) *Exporter {
-	var e Exporter
-	e.client = client
-	e.opts = opts
-	return &e
+	return &Exporter{
+		client: client,
+		opts:   opts,
+		mu:     new(sync.RWMutex),
+	}
 }
 
 func (e *Exporter) Export() error {
@@ -181,7 +189,7 @@ func (e *Exporter) runExport(files []git.FileChange, allChanges []git.FileChange
 	}
 
 	total := len(files)
-	e.printProgress(0, total)
+	e.printProgress(0, 0, total)
 
 	if e.opts.Concurrent {
 		e.copyConcurrent(files, total)
@@ -192,7 +200,15 @@ func (e *Exporter) runExport(files []git.FileChange, allChanges []git.FileChange
 	summary := manifest.Generate(allChanges)
 	summaryPath := filepath.Join(e.opts.OutputDir, "summary.txt")
 	if err := manifest.WriteToFile(summaryPath, summary); err != nil {
-		return fmt.Errorf("failed to write summary: %w", err)
+		return fmt.Errorf("failed to write summary.txt: %w", err)
+	}
+	if e.HasErrors() {
+		errorFile, err := os.Create(filepath.Join(e.opts.OutputDir, "errors.txt"))
+		if err != nil {
+			return fmt.Errorf("failed to write errors.txt: %w", err)
+		}
+		defer errorFile.Close()
+		e.WriteError(errorFile)
 	}
 
 	fmt.Printf("\n✓ Exported %d files to %s\n", total, e.opts.OutputDir)
@@ -219,17 +235,25 @@ func (e *Exporter) exportToZip(files []git.FileChange, allChanges []git.FileChan
 	w := zip.NewWriter(f)
 	defer w.Close()
 
-	total := len(files)
-	e.printProgress(0, total)
+	var (
+		successCount, failedCount int
+		total                     = len(files)
+		fw                        io.Writer
+	)
+	e.printProgress(successCount, failedCount, total)
 
-	for i, file := range files {
+	for _, file := range files {
 		content, err := e.client.GetFileContent(e.opts.ToCommit, file.Path)
 		if err != nil {
-			fmt.Printf("⚠ Failed to read: %s\n", file.Path)
-			continue
+			e.AddError(fmt.Errorf("%s: %w", file.Path, err))
+			if e.opts.Verbose {
+				fmt.Printf("⚠ Failed to read: %s\n", file.Path)
+			}
+			failedCount++
+			goto update_progress
 		}
 
-		fw, err := w.Create(file.Path)
+		fw, err = w.Create(file.Path)
 		if err != nil {
 			return fmt.Errorf("failed to add %s to zip: %w", file.Path, err)
 		}
@@ -241,17 +265,27 @@ func (e *Exporter) exportToZip(files []git.FileChange, allChanges []git.FileChan
 		if e.opts.Verbose {
 			e.printFileInfo(file)
 		}
-		e.printProgress(i+1, total)
+		successCount++
+	update_progress:
+		e.printProgress(successCount, failedCount, total)
 	}
 
 	// Add summary.txt
 	summary := manifest.Generate(allChanges)
-	fw, err := w.Create("summary.txt")
+	fw, err = w.Create("summary.txt")
 	if err != nil {
 		return fmt.Errorf("failed to add summary.txt to zip: %w", err)
 	}
 	if _, err := fw.Write([]byte(summary)); err != nil {
 		return fmt.Errorf("failed to write summary.txt to zip: %w", err)
+	}
+
+	if e.HasErrors() {
+		fw, err = w.Create("errors.txt")
+		if err != nil {
+			return fmt.Errorf("failed to add errors.txt to zip: %w", err)
+		}
+		e.WriteError(fw)
 	}
 
 	fmt.Printf("\n✓ Archived %d files to %s\n", total, e.opts.ArchivePath)
@@ -276,19 +310,26 @@ func (e *Exporter) exportToTarGz(files []git.FileChange, allChanges []git.FileCh
 	}
 	defer tw.Close()
 
-	total := len(files)
-	e.printProgress(0, total)
-
-	for i, file := range files {
+	var (
+		successCount, failedCount int
+		hdr                       *tar.Header
+		total                     = len(files)
+	)
+	e.printProgress(successCount, failedCount, total)
+	for _, file := range files {
 		content, err := e.client.GetFileContent(e.opts.ToCommit, file.Path)
 		if err != nil {
-			fmt.Printf("⚠ Failed to read: %s\n", file.Path)
-			continue
+			e.AddError(fmt.Errorf("%s: %w", file.Path, err))
+			if e.opts.Verbose {
+				fmt.Printf("⚠ Failed to read: %s\n", file.Path)
+			}
+			failedCount++
+			goto update_progress
 		}
 
-		hdr := &tar.Header{
+		hdr = &tar.Header{
 			Name: file.Path,
-			Mode: 0644,
+			Mode: 0o644,
 			Size: int64(len(content)),
 		}
 		if err := tw.WriteHeader(hdr); err != nil {
@@ -301,21 +342,38 @@ func (e *Exporter) exportToTarGz(files []git.FileChange, allChanges []git.FileCh
 		if e.opts.Verbose {
 			e.printFileInfo(file)
 		}
-		e.printProgress(i+1, total)
+		successCount++
+	update_progress:
+		e.printProgress(successCount, failedCount, total)
 	}
 
 	// Add summary.txt
 	summary := manifest.Generate(allChanges)
-	hdr := &tar.Header{
+	hdr = &tar.Header{
 		Name: "summary.txt",
-		Mode: 0644,
+		Mode: 0o644,
 		Size: int64(len(summary)),
 	}
 	if err := tw.WriteHeader(hdr); err != nil {
-		return fmt.Errorf("failed to write summary header: %w", err)
+		return fmt.Errorf("failed to write summary.txt header: %w", err)
 	}
 	if _, err := tw.Write([]byte(summary)); err != nil {
-		return fmt.Errorf("failed to write summary to tar: %w", err)
+		return fmt.Errorf("failed to write summary.txt to tar: %w", err)
+	}
+
+	errorString := e.errorString()
+	if len(errorString) > 0 {
+		hdr = &tar.Header{
+			Name: "errors.txt",
+			Mode: 0o644,
+			Size: int64(len(errorString)),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return fmt.Errorf("failed to write errors.txt header: %w", err)
+		}
+		if _, err := io.WriteString(tw, errorString); err != nil {
+			return fmt.Errorf("failed to write errors.txt: %w", err)
+		}
 	}
 
 	fmt.Printf("\n✓ Archived %d files to %s\n", total, e.opts.ArchivePath)
@@ -333,10 +391,11 @@ func (e *Exporter) printFileInfo(f git.FileChange) {
 	}
 }
 
-func (e *Exporter) printProgress(current, total int) {
+func (e *Exporter) printProgress(success, failed, total int) {
 	if !e.opts.Verbose {
+		current := success + failed
 		percent := float64(current) / float64(total) * 100
-		fmt.Printf("\r[%3.0f%%] %d/%d files", percent, current, total)
+		fmt.Printf("\r[%3.0f%%] %d/%d files (%d failed)", percent, success, total, failed)
 		if current == total {
 			fmt.Println()
 		}
@@ -375,32 +434,73 @@ func (e *Exporter) PrepareOutputDir() error {
 		return fmt.Errorf("failed to check output directory: %w", err)
 	}
 
-	return os.MkdirAll(e.opts.OutputDir, 0755)
+	return os.MkdirAll(e.opts.OutputDir, 0o755)
 }
 
 func (e *Exporter) copySequential(files []git.FileChange, total int) {
-	for i, f := range files {
-		e.CopyFile(f)
-		e.printProgress(i+1, total)
+	var successCount, failedCount int
+	for _, f := range files {
+		err := e.CopyFile(f)
+		if err != nil {
+			e.AddError(fmt.Errorf("%s: %s", "TITID KUDA", err))
+			if e.opts.Verbose {
+				fmt.Printf("⚠ Failed to copy: %s\n", f.Path)
+			}
+			failedCount++
+			goto update_progress
+		}
+		successCount++
+	update_progress:
+		e.printProgress(successCount, failedCount, total)
 	}
 }
 
-func (e *Exporter) copyConcurrent(files []git.FileChange, total int) {
-	var wg sync.WaitGroup
-	var counter int
-	var mu sync.Mutex
+const (
+	bufferSize = 20
+	numWorkers = 5
+)
 
-	for _, f := range files {
-		wg.Add(1)
-		go func(file git.FileChange) {
-			defer wg.Done()
-			e.CopyFile(file)
-			mu.Lock()
-			counter++
-			e.printProgress(counter, total)
-			mu.Unlock()
-		}(f)
+func (e *Exporter) copyConcurrent(files []git.FileChange, total int) {
+	fileCh := make(chan git.FileChange, bufferSize)
+	successCount := new(atomic.Int64)
+	failedCount := new(atomic.Int64)
+	wg := new(sync.WaitGroup)
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
+
+	for range numWorkers {
+		wg.Go(func() {
+			for {
+				select {
+				case <-signalCh:
+					return
+				case f, ok := <-fileCh:
+					if !ok {
+						return
+					}
+					err := e.CopyFile(f)
+					if err != nil {
+						e.AddError(fmt.Errorf("%s: %s", f.Path, err))
+						if e.opts.Verbose {
+							fmt.Printf("⚠ Failed to copy: %s\n", f.Path)
+						}
+						failedCount.Add(1)
+						goto update_progress
+					}
+					successCount.Add(1)
+				update_progress:
+					e.printProgress(int(successCount.Load()), int(failedCount.Load()), total)
+				}
+			}
+		})
 	}
+
+	go func() {
+		for _, f := range files {
+			fileCh <- f
+		}
+		close(fileCh)
+	}()
 	wg.Wait()
 }
 
@@ -417,11 +517,11 @@ func (e *Exporter) CopyFile(change git.FileChange) error {
 	targetPath := filepath.Join(e.opts.OutputDir, change.Path)
 	targetDir := filepath.Dir(targetPath)
 
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return err
 	}
 
-	if err := os.WriteFile(targetPath, content, 0644); err != nil {
+	if err := os.WriteFile(targetPath, content, 0o644); err != nil {
 		return err
 	}
 
@@ -448,4 +548,40 @@ func formatSize(bytes int64) string {
 	default:
 		return fmt.Sprintf("%dB", bytes)
 	}
+}
+
+func (e *Exporter) errorString() string {
+	e.mu.RLock()
+	errorList := slices.Clone(e.errors)
+	e.mu.RUnlock()
+	var sb strings.Builder
+	for i, err := range errorList {
+		sb.WriteString(err.Error())
+		if i < len(errorList)-1 {
+			sb.WriteByte('\n')
+		}
+	}
+
+	return sb.String()
+}
+
+func (e *Exporter) WriteError(w io.Writer) {
+	errorString := e.errorString()
+	_, _ = io.WriteString(w, errorString)
+}
+
+func (e *Exporter) AddError(err error) {
+	e.mu.Lock()
+	e.errors = append(e.errors, err)
+	e.mu.Unlock()
+}
+
+func (e *Exporter) ErrorCount() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return len(e.errors)
+}
+
+func (e *Exporter) HasErrors() bool {
+	return e.ErrorCount() > 0
 }

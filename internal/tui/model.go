@@ -54,10 +54,11 @@ type Model struct {
 	height int
 
 	// Progress tracking
-	totalFiles  int
-	doneFiles   int
-	currentFile string
-	progressCh  <-chan progressMsg
+	totalFiles   int
+	successCount int
+	failedCount  int
+	currentFile  string
+	progressCh   <-chan progressMsg
 }
 
 // NewModel creates a new TUI model with optional pre-filled commit range.

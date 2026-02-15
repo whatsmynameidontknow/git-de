@@ -1,7 +1,12 @@
 package tui
 
 import (
+	"os"
+	"os/signal"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
+	"syscall"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -148,26 +153,105 @@ func (m Model) startExport() tea.Cmd {
 			return err
 		}
 
-		total := len(selectedFiles)
-		progressChan := make(chan progressMsg)
-		go func() {
-			for i, f := range selectedFiles {
-				_ = exp.CopyFile(f)
-				progressChan <- progressMsg{
-					current: i + 1,
-					total:   total,
-					file:    f.Path,
-				}
-			}
-			close(progressChan)
-		}()
+		progressCh := make(chan progressMsg)
+		if len(selectedFiles) > concurrentThreshold {
+			m.exportConcurrent(exp, selectedFiles, progressCh)
+		} else {
+			m.exportSequential(exp, selectedFiles, progressCh)
+		}
 
 		summary := manifest.Generate(selectedFiles)
 		summaryPath := filepath.Join(m.outputPath, "summary.txt")
 		_ = manifest.WriteToFile(summaryPath, summary)
 
-		return exportStartedMsg{ch: progressChan}
+		return exportStartedMsg{ch: progressCh, fileCount: len(selectedFiles)}
 	}
+}
+
+func (m Model) exportSequential(exp *exporter.Exporter, files []git.FileChange, progressCh chan<- progressMsg) {
+	go func() {
+		var successCount, failedCount int
+		for _, f := range files {
+			err := exp.CopyFile(f)
+			if err != nil {
+				failedCount++
+				exp.AddError(copyError{
+					path: f.Path,
+					msg:  err,
+				})
+				goto send_progress
+			}
+			successCount++
+		send_progress:
+			progressCh <- progressMsg{
+				successCount: successCount,
+				failedCount:  failedCount,
+				file:         f.Path,
+			}
+		}
+		close(progressCh)
+		if exp.HasErrors() {
+			errorFile, _ := os.Create(filepath.Join(m.outputPath, "errors.txt"))
+
+			defer errorFile.Close()
+			exp.WriteError(errorFile)
+		}
+	}()
+}
+
+func (m Model) exportConcurrent(exp *exporter.Exporter, files []git.FileChange, progressCh chan<- progressMsg) {
+	fileCh := make(chan git.FileChange, bufferSize)
+	successCount := new(atomic.Int64)
+	failedCount := new(atomic.Int64)
+	wg := new(sync.WaitGroup)
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
+
+	for range numWorkers {
+		wg.Go(func() {
+			for {
+				select {
+				case <-signalCh:
+					return
+				case f, ok := <-fileCh:
+					if !ok {
+						return
+					}
+					err := exp.CopyFile(f)
+					if err != nil {
+						failedCount.Add(1)
+						exp.AddError(copyError{
+							msg:  err,
+							path: f.Path,
+						})
+						goto send_progress
+					}
+					successCount.Add(1)
+				send_progress:
+					progressCh <- progressMsg{
+						file:         f.Path,
+						successCount: int(successCount.Load()),
+						failedCount:  int(failedCount.Load()),
+					}
+				}
+			}
+		})
+	}
+
+	go func() {
+		for _, f := range files {
+			fileCh <- f
+		}
+		close(fileCh)
+		wg.Wait()
+		close(progressCh)
+		if exp.HasErrors() {
+			errorFile, _ := os.Create(filepath.Join(m.outputPath, "errors.txt"))
+
+			defer errorFile.Close()
+			exp.WriteError(errorFile)
+		}
+	}()
 }
 
 func waitForProgress(ch <-chan progressMsg) tea.Cmd {
