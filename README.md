@@ -43,7 +43,7 @@ git-de [options] <from-commit> [<to-commit>]
 **Notes:**
  - `-o` and `-a` are mutually exclusive — use one or the other. Both skip the TUI and run in CLI mode.
  - Specifying `-o` or `-a` without `from-commit` will go into TUI mode and ignore the output/archive flags, prompting for commits and output interactively.
- - TUI mode only works with commit SHAs. Branch names and tags must be resolved to SHAs before launching the TUI.
+ - In TUI mode, you select commits from a list. While you can pass branch names or tags as command-line arguments (e.g., `git-de main`), the interactive commit picker displays only commit SHAs.
 
 ### Examples
 
@@ -79,7 +79,7 @@ git-de --no-tui HEAD~5 HEAD -o ./export
 
 ## Requirements
 
-- Go 1.24+ (for building from source)
+- Go 1.25+ (for building from source)
 - Git installed and in PATH
 
 ## License

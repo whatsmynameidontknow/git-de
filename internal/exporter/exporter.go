@@ -440,7 +440,7 @@ func (e *Exporter) copySequential(files []git.FileChange, total int) {
 	for _, f := range files {
 		err := e.CopyFile(f)
 		if err != nil {
-			e.AddError(fmt.Errorf("%s: %s", "TITID KUDA", err))
+			e.AddError(fmt.Errorf("%s: %s", f.Path, err))
 			if e.opts.Verbose {
 				fmt.Printf("⚠ Failed to copy: %s\n", f.Path)
 			}
