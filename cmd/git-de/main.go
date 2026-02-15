@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
+	"strings"
 
 	"github.com/whatsmynameidontknow/git-de/internal/cli"
 	"github.com/whatsmynameidontknow/git-de/internal/exporter"
@@ -12,6 +14,15 @@ import (
 )
 
 var version string
+
+func init() {
+	if version == "" {
+		version = "dev"
+		if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+			version = strings.TrimPrefix(bi.Main.Version, "v")
+		}
+	}
+}
 
 func main() {
 	config, err := cli.Parse(os.Args[1:])
