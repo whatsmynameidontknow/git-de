@@ -11,11 +11,17 @@ import (
 	"golang.org/x/term"
 )
 
+var version string
+
 func main() {
 	config, err := cli.Parse(os.Args[1:])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
+	}
+	if config.ShowVersion {
+		fmt.Printf("Git Diff Export version %s\n", version)
+		return
 	}
 
 	client := git.NewClient("")

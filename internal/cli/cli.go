@@ -24,6 +24,7 @@ type Config struct {
 	MaxSize         int64
 	ArchivePath     string
 	NoTUI           bool
+	ShowVersion     bool
 }
 
 func Parse(args []string) (*Config, error) {
@@ -41,6 +42,7 @@ func Parse(args []string) (*Config, error) {
 	pflag.StringVar(&maxSizeStr, "max-size", "", "Maximum file size to export (e.g., 10MB, 500KB, 1GB)")
 	pflag.StringVarP(&config.ArchivePath, "archive", "a", "", "Export to archive file (.zip, .tar, .tar.gz, .tgz)")
 	pflag.BoolVar(&config.NoTUI, "no-tui", false, "Force CLI mode even in terminal")
+	pflag.BoolVar(&config.ShowVersion, "version", false, "Show app version")
 
 	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Usage: git-de [options] [<from-commit> [<to-commit>]]
