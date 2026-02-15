@@ -65,15 +65,15 @@ func (m Model) viewCommitRangeSummary(sb *strings.Builder) {
 	sb.WriteString("Commit Range Summary:\n\n")
 
 	if m.selectedBranch != "" {
-		fmt.Fprintf(sb, "Branch:        %s\n", m.selectedBranch)
+		fmt.Fprintf(sb, "Current Branch: %s\n", m.selectedBranch)
 	}
-	fmt.Fprintf(sb, "From:          %s\n", m.shortHash(m.fromCommit))
-	fmt.Fprintf(sb, "To:            %s\n", m.shortHash(m.toCommit))
+	fmt.Fprintf(sb, "From:           %s\n", m.shortHash(m.fromCommit))
+	fmt.Fprintf(sb, "To:             %s\n", m.shortHash(m.toCommit))
 	sb.WriteString("\n")
-	fmt.Fprintf(sb, "Commits:       %s\n", totalStyle.Render(strconv.Itoa(m.rangeStats.CommitCount)))
-	fmt.Fprintf(sb, "Files changed: %s\n", totalStyle.Render(strconv.Itoa(m.rangeStats.FilesChanged)))
-	fmt.Fprintf(sb, "Additions:     %s\n", successStyle.Render(fmt.Sprintf("+%d", m.rangeStats.Additions)))
-	fmt.Fprintf(sb, "Deletions:     %s\n", errorStyle.Render(fmt.Sprintf("-%d", m.rangeStats.Deletions)))
+	fmt.Fprintf(sb, "Commits:        %s\n", totalStyle.Render(strconv.Itoa(m.rangeStats.CommitCount)))
+	fmt.Fprintf(sb, "Files changed:  %s\n", totalStyle.Render(strconv.Itoa(m.rangeStats.FilesChanged)))
+	fmt.Fprintf(sb, "Additions:      %s\n", successStyle.Render(fmt.Sprintf("+%d", m.rangeStats.Additions)))
+	fmt.Fprintf(sb, "Deletions:      %s\n", errorStyle.Render(fmt.Sprintf("-%d", m.rangeStats.Deletions)))
 	sb.WriteString("\n[enter:proceed] [backspace:change range] [esc:quit]\n")
 }
 
