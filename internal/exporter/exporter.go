@@ -85,7 +85,7 @@ func (e *Exporter) Export() error {
 func (e *Exporter) ExportFiles(filesToCopy []git.FileChange, allChanges []git.FileChange) error {
 	var err error
 	if e.opts.Preview {
-		err = e.runPreview(filesToCopy, allChanges)
+		err = e.runPreview(filesToCopy)
 	} else if e.opts.ArchivePath != "" {
 		err = e.runArchiveExport(filesToCopy, allChanges)
 	} else {
@@ -172,14 +172,12 @@ func (e *Exporter) shouldInclude(path string) bool {
 	return false
 }
 
-func (e *Exporter) runPreview(files []git.FileChange, allChanges []git.FileChange) error {
+func (e *Exporter) runPreview(files []git.FileChange) error {
 	fmt.Println("=== PREVIEW MODE (no files will be copied) ===")
 	fmt.Printf("\nFiles that would be exported (%d):\n", len(files))
 	for _, f := range files {
 		e.printFileInfo(f)
 	}
-	fmt.Println("\n=== Summary ===")
-	fmt.Println(manifest.Generate(allChanges))
 	return nil
 }
 
