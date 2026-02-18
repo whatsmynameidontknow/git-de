@@ -249,18 +249,18 @@ func TestUpdate_FileSelection_Navigation(t *testing.T) {
 		t.Errorf("Expected cursor at 2, got %d", model.cursor)
 	}
 
-	// Move down past end (should stay)
+	// Move down past end (should go to first item)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
 	model = updated.(Model)
-	if model.cursor != 2 {
-		t.Errorf("Expected cursor to stay at 2, got %d", model.cursor)
+	if model.cursor != 0 {
+		t.Errorf("Expected cursor at 0, got %d", model.cursor)
 	}
 
-	// Move up
+	// Move up from first item (should go to last item)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyUp})
 	model = updated.(Model)
-	if model.cursor != 1 {
-		t.Errorf("Expected cursor at 1, got %d", model.cursor)
+	if model.cursor != 2 {
+		t.Errorf("Expected cursor at 2, got %d", model.cursor)
 	}
 }
 
@@ -514,7 +514,7 @@ func TestView_Done(t *testing.T) {
 	}
 	bottomText := "Press any key to exit"
 	if runtime.GOOS == "windows" {
-		bottomText = fmt.Sprintf("Press %s to open output directory, other keys to exit", successStyle.Render("e"))
+		bottomText = fmt.Sprintf("Press %s to open the output directory, other keys to exit", successStyle.Render("e"))
 	}
 	if !strings.Contains(view, bottomText) {
 		t.Errorf("Expected bottom text to be: %s", bottomText)

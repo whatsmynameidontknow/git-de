@@ -362,13 +362,9 @@ func (m Model) handleKeyFileSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.filterInput.Focus()
 		return m, nil
 	case "up", "k":
-		if m.cursor > 0 {
-			m.cursor--
-		}
+		m.moveCursor(-1)
 	case "down", "j":
-		if m.cursor < len(m.filteredIdx)-1 {
-			m.cursor++
-		}
+		m.moveCursor(1)
 	case " ":
 		if len(m.filteredIdx) > 0 {
 			idx := m.filteredIdx[m.cursor]
@@ -406,8 +402,17 @@ func (m Model) handleKeyFileSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyFileFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	switch key := msg.String(); key {
 	case "up", "down":
+		if len(m.filteredIdx) == 0 {
+			return m, nil
+		}
+		switch key {
+		case "up":
+			m.moveCursor(-1)
+		case "down":
+			m.moveCursor(1)
+		}
 		m.inputMode = false
 		m.filterInput.Blur()
 		if len(m.filteredIdx) == 0 {
@@ -506,4 +511,13 @@ func (m Model) handleKeyConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	return m, nil
+}
+
+func (m *Model) moveCursor(delta int) {
+	n := len(m.filteredIdx)
+	if n == 0 {
+		m.cursor = 0
+		return
+	}
+	m.cursor = (m.cursor + delta + n) % n
 }
