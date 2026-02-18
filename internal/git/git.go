@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
@@ -29,6 +30,7 @@ type FileChange struct {
 
 type Commit struct {
 	Hash    string
+	Time    time.Time
 	Message string
 }
 
@@ -151,11 +153,11 @@ func (c *Client) IsFileOutsideRepo(path string) bool {
 }
 
 func (c *Client) GetRecentCommits(n int) ([]Commit, error) {
-	return c.getCommits("git", "log", "-n", fmt.Sprintf("%d", n), "--pretty=format:%H %s")
+	return c.getCommits("git", "log", "-n", fmt.Sprintf("%d", n), "--pretty=format:%H %aI %s")
 }
 
 func (c *Client) GetCommitsAfter(after string, n int) ([]Commit, error) {
-	return c.getCommits("git", "log", "-n", fmt.Sprintf("%d", n), "--pretty=format:%H %s", after+"..HEAD")
+	return c.getCommits("git", "log", "-n", fmt.Sprintf("%d", n), "--pretty=format:%H %aI %s", after+"..HEAD")
 }
 
 func (c *Client) getCommits(name string, args ...string) ([]Commit, error) {
@@ -171,11 +173,15 @@ func (c *Client) getCommits(name string, args ...string) ([]Commit, error) {
 	scanner := bufio.NewScanner(strings.NewReader(string(output)))
 	for scanner.Scan() {
 		line := scanner.Text()
-		parts := strings.SplitN(line, " ", 2)
-		if len(parts) == 2 {
+		parts := strings.SplitN(line, " ", 3)
+		if len(parts) == 3 {
 			var commit Commit
 			commit.Hash = parts[0]
-			commit.Message = parts[1]
+			commit.Time, err = time.Parse(time.RFC3339, parts[1])
+			if err != nil {
+				return nil, fmt.Errorf("date parsing failed: %w", err)
+			}
+			commit.Message = parts[2]
 			commits = append(commits, commit)
 		}
 	}

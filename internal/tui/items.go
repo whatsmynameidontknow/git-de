@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/whatsmynameidontknow/git-de/internal/git"
 )
@@ -47,12 +48,19 @@ func (b branchItem) FilterValue() string {
 }
 
 type commitItem struct {
+	time    time.Time
 	sha     string
 	message string
 }
 
-func (i commitItem) Title() string       { return i.message }
-func (i commitItem) Description() string { return i.sha }
+func newCommitItem(c git.Commit) commitItem {
+	return commitItem{c.Time, c.Hash, c.Message}
+}
+
+func (i commitItem) Title() string { return i.message }
+func (i commitItem) Description() string {
+	return fmt.Sprintf("%s\t(%s)", i.sha, i.time.Format("02 January 2006 15:04:05"))
+}
 func (i commitItem) FilterValue() string { return i.message }
 
 type limitOption struct {

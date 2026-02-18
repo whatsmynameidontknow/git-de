@@ -282,7 +282,7 @@ func (c *Client) GetRecentCommitsOnBranch(branch string, n int) ([]Commit, error
 	return c.getCommits("git", "log", branch,
 		"-n", fmt.Sprintf("%d", n),
 		"--no-merges",
-		"--pretty=format:%H %s")
+		"--pretty=format:%H %aI %s")
 }
 
 // CheckoutBranch checks out the specified branch.

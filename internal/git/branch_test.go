@@ -16,7 +16,7 @@ func TestClient_GetDefaultBranch(t *testing.T) {
 		client := NewClient(repoDir)
 
 		// Create initial commit on main
-		os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+		os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0o644)
 		runGit(t, repoDir, "add", ".")
 		runGit(t, repoDir, "commit", "-m", "initial")
 
@@ -36,7 +36,7 @@ func TestClient_GetDefaultBranch(t *testing.T) {
 		repoDir := setupTestRepo(t)
 		client := NewClient(repoDir)
 
-		os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+		os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0o644)
 		runGit(t, repoDir, "add", ".")
 		runGit(t, repoDir, "commit", "-m", "initial")
 
@@ -56,7 +56,7 @@ func TestClient_GetDefaultBranch(t *testing.T) {
 		repoDir := setupTestRepo(t)
 		client := NewClient(repoDir)
 
-		os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+		os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0o644)
 		runGit(t, repoDir, "add", ".")
 		runGit(t, repoDir, "commit", "-m", "initial")
 
@@ -74,7 +74,7 @@ func TestClient_BranchExists(t *testing.T) {
 	repoDir := setupTestRepo(t)
 	client := NewClient(repoDir)
 
-	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "initial")
 	runGit(t, repoDir, "branch", "-M", "main")
@@ -97,21 +97,21 @@ func TestClient_GetBranches(t *testing.T) {
 	client := NewClient(repoDir)
 
 	// Create initial commit
-	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "initial commit")
 	runGit(t, repoDir, "branch", "-M", "main")
 
 	// Create feature branch
 	runGit(t, repoDir, "checkout", "-b", "feature/auth")
-	os.WriteFile(filepath.Join(repoDir, "auth.go"), []byte("package auth"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "auth.go"), []byte("package auth"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "add auth")
 
 	// Create another branch
 	runGit(t, repoDir, "checkout", "main")
 	runGit(t, repoDir, "checkout", "-b", "bugfix/login")
-	os.WriteFile(filepath.Join(repoDir, "login.go"), []byte("package login"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "login.go"), []byte("package login"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "fix login")
 
@@ -220,7 +220,7 @@ func TestClient_GetBranchAheadBehind(t *testing.T) {
 	client := NewClient(repoDir)
 
 	// Create initial commit on main
-	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "initial")
 	runGit(t, repoDir, "branch", "-M", "main")
@@ -228,7 +228,7 @@ func TestClient_GetBranchAheadBehind(t *testing.T) {
 	// Create feature branch with 2 commits ahead
 	runGit(t, repoDir, "checkout", "-b", "feature/test")
 	for i := 1; i <= 2; i++ {
-		os.WriteFile(filepath.Join(repoDir, fmt.Sprintf("feat%d.go", i)), []byte("package feat"), 0644)
+		os.WriteFile(filepath.Join(repoDir, fmt.Sprintf("feat%d.go", i)), []byte("package feat"), 0o644)
 		runGit(t, repoDir, "add", ".")
 		runGit(t, repoDir, "commit", "-m", fmt.Sprintf("feat %d", i))
 	}
@@ -249,7 +249,7 @@ func TestClient_GetBranchAheadBehind(t *testing.T) {
 	t.Run("returns correct behind count", func(t *testing.T) {
 		// Add commit on main
 		runGit(t, repoDir, "checkout", "main")
-		os.WriteFile(filepath.Join(repoDir, "main_update.go"), []byte("package main"), 0644)
+		os.WriteFile(filepath.Join(repoDir, "main_update.go"), []byte("package main"), 0o644)
 		runGit(t, repoDir, "add", ".")
 		runGit(t, repoDir, "commit", "-m", "main update")
 
@@ -278,14 +278,14 @@ func TestClient_IsBranchMerged(t *testing.T) {
 	client := NewClient(repoDir)
 
 	// Create initial commit on main
-	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "initial")
 	runGit(t, repoDir, "branch", "-M", "main")
 
 	// Create and merge a branch
 	runGit(t, repoDir, "checkout", "-b", "feature/merged")
-	os.WriteFile(filepath.Join(repoDir, "merged.go"), []byte("package merged"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "merged.go"), []byte("package merged"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "merged feature")
 	runGit(t, repoDir, "checkout", "main")
@@ -293,7 +293,7 @@ func TestClient_IsBranchMerged(t *testing.T) {
 
 	// Create an unmerged branch
 	runGit(t, repoDir, "checkout", "-b", "feature/unmerged")
-	os.WriteFile(filepath.Join(repoDir, "unmerged.go"), []byte("package unmerged"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "unmerged.go"), []byte("package unmerged"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "unmerged feature")
 	runGit(t, repoDir, "checkout", "main")
@@ -321,7 +321,7 @@ func TestClient_GetCurrentBranch(t *testing.T) {
 	repoDir := setupTestRepo(t)
 	client := NewClient(repoDir)
 
-	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "initial")
 	runGit(t, repoDir, "branch", "-M", "main")
@@ -353,14 +353,14 @@ func TestClient_GetBranchesFiltered(t *testing.T) {
 	client := NewClient(repoDir)
 
 	// Create initial commit on main
-	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "initial commit")
 	runGit(t, repoDir, "branch", "-M", "main")
 
 	// Create and merge a branch (simulating remote merged)
 	runGit(t, repoDir, "checkout", "-b", "feature/merged")
-	os.WriteFile(filepath.Join(repoDir, "merged.go"), []byte("package merged"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "merged.go"), []byte("package merged"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "add merged feature")
 	runGit(t, repoDir, "checkout", "main")
@@ -368,7 +368,7 @@ func TestClient_GetBranchesFiltered(t *testing.T) {
 
 	// Create an unmerged branch
 	runGit(t, repoDir, "checkout", "-b", "feature/unmerged")
-	os.WriteFile(filepath.Join(repoDir, "unmerged.go"), []byte("package unmerged"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "unmerged.go"), []byte("package unmerged"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "add unmerged feature")
 	runGit(t, repoDir, "checkout", "main")
@@ -401,17 +401,17 @@ func TestClient_GetBranchesWithAheadBehind(t *testing.T) {
 	client := NewClient(repoDir)
 
 	// Create initial commit on main
-	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "initial")
 	runGit(t, repoDir, "branch", "-M", "main")
 
 	// Create feature branch with 2 commits
 	runGit(t, repoDir, "checkout", "-b", "feature/test")
-	os.WriteFile(filepath.Join(repoDir, "feat1.go"), []byte("package feat"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "feat1.go"), []byte("package feat"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "feat 1")
-	os.WriteFile(filepath.Join(repoDir, "feat2.go"), []byte("package feat"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "feat2.go"), []byte("package feat"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "feat 2")
 	runGit(t, repoDir, "checkout", "main")
@@ -440,9 +440,10 @@ func TestClient_GetBranchesWithAheadBehind(t *testing.T) {
 func TestClient_GetRecentCommitsOnBranch(t *testing.T) {
 	repoDir := setupTestRepo(t)
 	client := NewClient(repoDir)
+	commitTime := time.Date(2012, 12, 21, 14, 15, 25, 0, time.Local)
 
 	// Create initial commit on main
-	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "initial")
 	runGit(t, repoDir, "branch", "-M", "main")
@@ -450,9 +451,9 @@ func TestClient_GetRecentCommitsOnBranch(t *testing.T) {
 	// Create feature branch with some commits
 	runGit(t, repoDir, "checkout", "-b", "feature/test")
 	for i := 1; i <= 3; i++ {
-		os.WriteFile(filepath.Join(repoDir, fmt.Sprintf("feat%d.go", i)), []byte("package feat"), 0644)
+		os.WriteFile(filepath.Join(repoDir, fmt.Sprintf("feat%d.go", i)), []byte("package feat"), 0o644)
 		runGit(t, repoDir, "add", ".")
-		runGit(t, repoDir, "commit", "-m", fmt.Sprintf("feat commit %d", i))
+		runGit(t, repoDir, "commit", "-m", fmt.Sprintf("feat commit %d", i), "--date", commitTime.Format(time.RFC3339))
 	}
 
 	t.Run("returns commits from specific branch", func(t *testing.T) {
@@ -467,6 +468,10 @@ func TestClient_GetRecentCommitsOnBranch(t *testing.T) {
 
 		if commits[0].Message != "feat commit 3" {
 			t.Errorf("Expected first commit to be 'feat commit 3', got %q", commits[0].Message)
+		}
+
+		if commits[0].Time != commitTime.Truncate(time.Millisecond) {
+			t.Errorf("Expected first commit date to be %s, got %s", commitTime, commits[0].Time)
 		}
 	})
 
@@ -504,7 +509,7 @@ func TestClient_CheckoutBranch(t *testing.T) {
 	client := NewClient(repoDir)
 
 	// Create initial commit on main
-	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "initial")
 	runGit(t, repoDir, "branch", "-M", "main")
@@ -541,7 +546,7 @@ func TestClient_GetCommitRangeStats(t *testing.T) {
 	client := NewClient(repoDir)
 
 	// Create initial commit on main
-	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("content"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "initial")
 
@@ -551,12 +556,12 @@ func TestClient_GetCommitRangeStats(t *testing.T) {
 	firstCommit := strings.TrimSpace(string(out))
 
 	// Add more commits
-	os.WriteFile(filepath.Join(repoDir, "file2.txt"), []byte("new file content"), 0644)
-	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("modified content"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "file2.txt"), []byte("new file content"), 0o644)
+	os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("modified content"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "second")
 
-	os.WriteFile(filepath.Join(repoDir, "file3.txt"), []byte("another file"), 0644)
+	os.WriteFile(filepath.Join(repoDir, "file3.txt"), []byte("another file"), 0o644)
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "third")
 

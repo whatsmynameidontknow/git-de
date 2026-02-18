@@ -35,7 +35,7 @@ func (m Model) loadCommitsOnBranchCmd() tea.Msg {
 	}
 	var items []list.Item
 	for _, c := range commits {
-		items = append(items, commitItem{sha: c.Hash, message: c.Message})
+		items = append(items, newCommitItem(c))
 	}
 	return items
 }
@@ -55,7 +55,7 @@ func (m Model) loadToCommitsOnBranchCmd() tea.Msg {
 			continue
 		}
 		if !foundFrom {
-			items = append(items, commitItem{sha: c.Hash, message: c.Message})
+			items = append(items, newCommitItem(c))
 		}
 	}
 	// If fromCommit not found in list (e.g., it's older), show all
@@ -63,7 +63,7 @@ func (m Model) loadToCommitsOnBranchCmd() tea.Msg {
 		items = nil
 		for _, c := range commits {
 			if c.Hash != m.fromCommit {
-				items = append(items, commitItem{sha: c.Hash, message: c.Message})
+				items = append(items, newCommitItem(c))
 			}
 		}
 	}
@@ -93,7 +93,7 @@ func (m Model) loadCommitsCmd() tea.Msg {
 	}
 	var items []list.Item
 	for _, c := range commits {
-		items = append(items, commitItem{sha: c.Hash, message: c.Message})
+		items = append(items, newCommitItem(c))
 	}
 	return items
 }
@@ -105,7 +105,7 @@ func (m Model) loadToCommitsCmd() tea.Msg {
 	}
 	var items []list.Item
 	for _, c := range commits {
-		items = append(items, commitItem{sha: c.Hash, message: c.Message})
+		items = append(items, newCommitItem(c))
 	}
 	return items
 }

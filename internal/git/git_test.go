@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func runGit(t *testing.T, dir string, args ...string) {
@@ -335,12 +336,14 @@ func TestClient_IsFileOutsideRepo(t *testing.T) {
 func TestClient_GetRecentCommits(t *testing.T) {
 	repoDir := setupTestRepo(t)
 
+	commitTime := time.Date(2012, 12, 21, 14, 15, 25, 0, time.Local)
+
 	// Create 3 commits
 	for i := 1; i <= 3; i++ {
 		filename := fmt.Sprintf("file%d.txt", i)
 		os.WriteFile(filepath.Join(repoDir, filename), []byte("content"), 0o644)
 		runGit(t, repoDir, "add", filename)
-		runGit(t, repoDir, "commit", "-m", fmt.Sprintf("commit %d", i))
+		runGit(t, repoDir, "commit", "--date", commitTime.Format(time.RFC3339), "-m", fmt.Sprintf("commit %d", i))
 	}
 
 	c := NewClient(repoDir)
@@ -355,5 +358,9 @@ func TestClient_GetRecentCommits(t *testing.T) {
 
 	if commits[0].Message != "commit 3" {
 		t.Errorf("Expected first commit message to be 'commit 3', got %s", commits[0].Message)
+	}
+
+	if commits[0].Time != commitTime.Truncate(time.Millisecond) {
+		t.Errorf("Expected first commit date to be %s, got %s", commitTime, commits[0].Time)
 	}
 }
