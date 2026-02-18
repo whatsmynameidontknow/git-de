@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -493,6 +494,13 @@ func TestView_Done(t *testing.T) {
 	}
 	if !strings.Contains(view, errorStyle.Render("Failed Count:\t5 files")) {
 		t.Error("Expected number of failed count in view to be 5")
+	}
+	bottomText := "Press any key to exit"
+	if runtime.GOOS == "windows" {
+		bottomText = fmt.Sprintf("Press %s to open output directory, other keys to exit", successStyle.Render("e"))
+	}
+	if !strings.Contains(view, bottomText) {
+		t.Errorf("Expected bottom text to be: %s", bottomText)
 	}
 }
 

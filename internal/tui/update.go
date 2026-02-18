@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"runtime"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -170,10 +171,6 @@ func (m Model) handleProgress(msg progressMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.state == stateDone {
-		return m, tea.Quit
-	}
-
 	if msg.String() == "ctrl+c" {
 		return m, tea.Quit
 	}
@@ -197,9 +194,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleKeyOutputPath(msg)
 	case stateConfirm:
 		return m.handleKeyConfirm(msg)
+	case stateDone:
+		return m.handleKeyDone(msg)
 	}
 
 	return m, nil
+}
+
+func (m Model) handleKeyDone(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if runtime.GOOS == "windows" && msg.String() == "e" || msg.String() == "E" {
+		return m, m.openExportDirectory()
+	}
+	return m, tea.Quit
 }
 
 func (m Model) handleKeyBranchSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

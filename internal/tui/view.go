@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -202,5 +203,9 @@ func (m Model) viewDone(sb *strings.Builder) {
 	if m.failedCount > 0 {
 		fmt.Fprintf(sb, "List of failed files saved to: %s\n", filepath.Join(m.outputPath, "errors.txt"))
 	}
-	sb.WriteString("\nPress any key to exit\n")
+	if runtime.GOOS == "windows" {
+		fmt.Fprintf(sb, "\nPress %s to open output directory, other keys to exit\n", successStyle.Render("e"))
+		return
+	}
+	fmt.Fprintln(sb, "\nPress any key to exit")
 }

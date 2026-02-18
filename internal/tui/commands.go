@@ -2,6 +2,7 @@ package tui
 
 import (
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"sync"
@@ -252,6 +253,17 @@ func (m Model) exportConcurrent(exp *exporter.Exporter, files []git.FileChange, 
 			exp.WriteError(errorFile)
 		}
 	}()
+}
+
+func (m Model) openExportDirectory() tea.Cmd {
+	wd, err := os.Getwd()
+	if err != nil {
+		return tea.Quit
+	}
+	absolutePath := filepath.Join(wd, m.outputPath)
+	cmd := exec.Command("explorer", absolutePath)
+	_ = cmd.Run()
+	return tea.Quit
 }
 
 func waitForProgress(ch <-chan progressMsg) tea.Cmd {
