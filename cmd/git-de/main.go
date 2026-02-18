@@ -47,7 +47,7 @@ func main() {
 	useTUI := shouldUseTUI(config)
 
 	if useTUI {
-		if err := tui.Run(client, config.FromCommit, config.ToCommit); err != nil {
+		if err := tui.Run(client, config.FromCommit, config.ToCommit, version); err != nil {
 			fmt.Fprintf(os.Stderr, "TUI Error: %v\n", err)
 			os.Exit(1)
 		}

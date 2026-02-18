@@ -19,6 +19,7 @@ type Model struct {
 	state     sessionState
 	gitClient gitClient
 	err       error
+	titleText string
 
 	// Branch selection
 	selectedBranch string
@@ -74,7 +75,7 @@ type gitClient interface {
 }
 
 // NewModel creates a new TUI model with optional pre-filled commit range.
-func NewModel(client gitClient, from, to string) (Model, error) {
+func NewModel(client gitClient, from, to, version string) (Model, error) {
 	ti := textinput.New()
 	ti.Placeholder = defaultOutputPath
 	ti.SetValue(defaultOutputPath)
@@ -94,6 +95,7 @@ func NewModel(client gitClient, from, to string) (Model, error) {
 	prog := progress.New(progress.WithDefaultGradient())
 
 	m := Model{
+		titleText:   "Git Diff Export " + version,
 		gitClient:   client,
 		list:        commitList,
 		input:       ti,
@@ -122,8 +124,8 @@ func NewModel(client gitClient, from, to string) (Model, error) {
 }
 
 // Run starts the TUI program.
-func Run(client *git.Client, from, to string) error {
-	m, err := NewModel(client, from, to)
+func Run(client *git.Client, from, to, version string) error {
+	m, err := NewModel(client, from, to, version)
 	if err != nil {
 		return err
 	}

@@ -13,7 +13,7 @@ import (
 func (m Model) View() string {
 	var sb strings.Builder
 
-	sb.WriteString(titleStyle.Render("Git Diff Export") + "\n\n")
+	sb.WriteString(titleStyle.Render(m.titleText) + "\n\n")
 
 	switch m.state {
 	case stateBranchSelection:
