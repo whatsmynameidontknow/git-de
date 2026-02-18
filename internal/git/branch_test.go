@@ -470,7 +470,7 @@ func TestClient_GetRecentCommitsOnBranch(t *testing.T) {
 			t.Errorf("Expected first commit to be 'feat commit 3', got %q", commits[0].Message)
 		}
 
-		if commits[0].Time != commitTime.Truncate(time.Millisecond) {
+		if !commits[0].Time.Equal(commitTime.Truncate(time.Millisecond)) {
 			t.Errorf("Expected first commit date to be %s, got %s", commitTime, commits[0].Time)
 		}
 	})

@@ -360,7 +360,7 @@ func TestClient_GetRecentCommits(t *testing.T) {
 		t.Errorf("Expected first commit message to be 'commit 3', got %s", commits[0].Message)
 	}
 
-	if commits[0].Time != commitTime.Truncate(time.Millisecond) {
+	if !commits[0].Time.Equal(commitTime.Truncate(time.Millisecond)) {
 		t.Errorf("Expected first commit date to be %s, got %s", commitTime, commits[0].Time)
 	}
 }
