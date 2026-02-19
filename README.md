@@ -1,6 +1,9 @@
-# git-de
+# Git D(iff) E(xport)
+<p align="center">
+  <img src="https://github.com/whatsmynameidontknow/git-de/blob/main/media/demo.gif?raw=true" alt="git-de demo"/>
+</p>
 
-Git Diff Export - A CLI tool to export files changed between Git commits while preserving directory structure.
+A **CLI** tool to export files changed between Git commits while preserving directory structure.
 
 ## Installation
 
