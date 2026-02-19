@@ -33,6 +33,7 @@ func (g gitClientMock) IsGitRepository() (ok bool)                              
 func (g gitClientMock) HasCommits() (ok bool)                                          { return }
 func (g gitClientMock) IsFileOutsideRepo(path string) (ok bool)                        { return }
 func (g gitClientMock) CheckoutBranch(branch string) (err error)                       { return }
+func (g gitClientMock) IsValid(sha string) (ok bool)                                   { return true }
 
 const version = "v0.0.1"
 
@@ -1014,5 +1015,230 @@ func TestUpdate_CommitRangeSummary_BackspaceGoesToToCommit(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Error("Expected loadToCommitsCmd to be returned")
+	}
+}
+
+// --- Inclusive Mode Tests ---
+
+func TestNewModel_InclusiveModeDefaultsToFalse(t *testing.T) {
+	m, err := NewModel(&gitClientMock{}, "", "", version)
+	if err != nil {
+		t.Fatalf("Expected error to be nil, got %s", err)
+	}
+	if m.inclusiveMode {
+		t.Error("Expected inclusiveMode to default to false")
+	}
+}
+
+func TestUpdate_ToggleInclusiveMode(t *testing.T) {
+	m, err := NewModel(&gitClientMock{}, "", "", version)
+	if err != nil {
+		t.Fatalf("Expected error to be nil, got %s", err)
+	}
+	m.state = stateFromCommit
+	tt := []struct {
+		name  string
+		state sessionState
+	}{
+		{
+			"State From Commit",
+			stateFromCommit,
+		},
+		{
+			"State To Commit",
+			stateToCommit,
+		},
+		{
+			"State Commit Range Summary",
+			stateCommitRangeSummary,
+		},
+	}
+
+	for _, v := range tt {
+		m.state = v.state
+		m.inclusiveMode = false
+		// Press 'i' to toggle ON
+		updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+		model := updated.(Model)
+
+		if !model.inclusiveMode {
+			t.Errorf("%s: Expected inclusiveMode to be true after pressing 'i'", v.name)
+		}
+
+		// Press 'i' again to toggle OFF
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+		model = updated.(Model)
+
+		if model.inclusiveMode {
+			t.Errorf("%s: Expected inclusiveMode to be false after pressing 'i' again", v.name)
+		}
+	}
+}
+
+func TestUpdate_FromCommit_InclusiveModeAppliesParentCommit(t *testing.T) {
+	m, err := NewModel(&gitClientMock{}, "", "", version)
+	if err != nil {
+		t.Fatalf("Expected error to be nil, got %s", err)
+	}
+	m.state = stateFromCommit
+	m.inclusiveMode = true
+
+	// Load commits into the list
+	items := []list.Item{
+		commitItem{sha: "abc123", message: "test commit"},
+	}
+	updated, _ := m.Update(items)
+	model := updated.(Model)
+
+	// Select the commit with Enter
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+
+	if model.fromCommit != "abc123^" {
+		t.Errorf("Expected fromCommit 'abc123^' with inclusive mode, got %q", model.fromCommit)
+	}
+	if model.state != stateToCommit {
+		t.Errorf("Expected state stateToCommit, got %d", model.state)
+	}
+}
+
+func TestUpdate_FromCommit_WithoutInclusiveModeUsesCommitDirectly(t *testing.T) {
+	m, err := NewModel(&gitClientMock{}, "", "", version)
+	if err != nil {
+		t.Fatalf("Expected error to be nil, got %s", err)
+	}
+	m.state = stateFromCommit
+	m.inclusiveMode = false
+
+	// Load commits into the list
+	items := []list.Item{
+		commitItem{sha: "abc123", message: "test commit"},
+	}
+	updated, _ := m.Update(items)
+	model := updated.(Model)
+
+	// Select the commit with Enter
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+
+	if model.fromCommit != "abc123" {
+		t.Errorf("Expected fromCommit 'abc123' without inclusive mode, got %q", model.fromCommit)
+	}
+}
+
+func TestView_FromCommit_ShowsInclusiveModeOFF(t *testing.T) {
+	m, err := NewModel(&gitClientMock{}, "", "", version)
+	if err != nil {
+		t.Fatalf("Expected error to be nil, got %s", err)
+	}
+	m.state = stateFromCommit
+	m.inclusiveMode = false
+
+	view := m.View()
+
+	if !strings.Contains(view, "INCLUSIVE MODE [N]") {
+		t.Errorf("Expected view to contain 'INCLUSIVE MODE [N]', got:\n%s", view)
+	}
+}
+
+func TestView_FromCommit_ShowsInclusiveModeON(t *testing.T) {
+	m, err := NewModel(&gitClientMock{}, "", "", version)
+	if err != nil {
+		t.Fatalf("Expected error to be nil, got %s", err)
+	}
+	m.state = stateFromCommit
+	m.inclusiveMode = true
+
+	view := m.View()
+
+	if !strings.Contains(view, "INCLUSIVE MODE [Y]") {
+		t.Errorf("Expected view to contain 'INCLUSIVE MODE [Y]', got:\n%s", view)
+	}
+}
+
+func TestView_InclusiveModePersistsAcrossStates(t *testing.T) {
+	states := []struct {
+		name  string
+		state sessionState
+	}{
+		{"FromCommit", stateFromCommit},
+		{"ToCommit", stateToCommit},
+		{"CommitRangeSummary", stateCommitRangeSummary},
+		{"FileSelection", stateFileSelection},
+	}
+
+	for _, tc := range states {
+		t.Run(tc.name+"_ON", func(t *testing.T) {
+			m, err := NewModel(&gitClientMock{}, "", "", version)
+			if err != nil {
+				t.Fatalf("Expected error to be nil, got %s", err)
+			}
+			m.state = tc.state
+			m.inclusiveMode = true
+
+			view := m.View()
+
+			if !strings.Contains(view, "INCLUSIVE MODE [Y]") {
+				t.Errorf("Expected view to contain 'INCLUSIVE MODE [Y]' in state %s, got:\n%s", tc.name, view)
+			}
+		})
+
+		t.Run(tc.name+"_OFF", func(t *testing.T) {
+			m, err := NewModel(&gitClientMock{}, "", "", version)
+			if err != nil {
+				t.Fatalf("Expected error to be nil, got %s", err)
+			}
+			m.state = tc.state
+			m.inclusiveMode = false
+
+			view := m.View()
+
+			if !strings.Contains(view, "INCLUSIVE MODE [N]") {
+				t.Errorf("Expected view to contain 'INCLUSIVE MODE [N]' in state %s, got:\n%s", tc.name, view)
+			}
+		})
+	}
+}
+
+func TestView_InclusiveModeIndicatorAppearsBeforeContent(t *testing.T) {
+	m, err := NewModel(&gitClientMock{}, "", "", version)
+	if err != nil {
+		t.Fatalf("Expected error to be nil, got %s", err)
+	}
+	m.state = stateFromCommit
+	m.inclusiveMode = true
+
+	view := m.View()
+
+	// Indicator should appear before list content (at the top)
+	indicatorIdx := strings.Index(view, "INCLUSIVE MODE")
+	if indicatorIdx == -1 {
+		t.Fatal("Expected view to contain 'INCLUSIVE MODE' indicator")
+	}
+
+	// The indicator should come after the title but be near the top
+	titleIdx := strings.Index(view, m.titleText)
+	if titleIdx == -1 {
+		t.Fatal("Expected view to contain title")
+	}
+	if indicatorIdx < titleIdx {
+		t.Error("Expected inclusive mode indicator to appear after title")
+	}
+}
+
+func TestUpdate_FromCommit_InclusiveModeDoesNotAffectOtherKeys(t *testing.T) {
+	m, err := NewModel(&gitClientMock{}, "", "", version)
+	if err != nil {
+		t.Fatalf("Expected error to be nil, got %s", err)
+	}
+	m.state = stateFromCommit
+	m.inclusiveMode = true
+
+	// Backspace should still go back to limit selection
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	model := updated.(Model)
+
+	if model.state != stateCommitLimitSelection {
+		t.Errorf("Expected state stateCommitLimitSelection, got %d", model.state)
 	}
 }

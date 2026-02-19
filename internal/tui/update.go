@@ -86,11 +86,23 @@ func (m Model) handleListItems(items []list.Item) (tea.Model, tea.Cmd) {
 	m.list.KeyMap.Quit = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "quit"))
 
 	switch m.state {
+	case stateFromCommit, stateToCommit:
+		iBinding := key.NewBinding(key.WithKeys("i", "I"), key.WithHelp("i/I", "toggle inclusive mode"))
+		backspaceBinding := key.NewBinding(key.WithKeys("backspace"), key.WithHelp("backspace", "back"))
+		m.list.AdditionalShortHelpKeys = func() []key.Binding {
+			return []key.Binding{backspaceBinding, iBinding}
+		}
+		m.list.AdditionalFullHelpKeys = func() []key.Binding {
+			return []key.Binding{backspaceBinding, iBinding}
+		}
+	}
+
+	switch m.state {
 	case stateBranchSelection:
 		m.list.Title = "Select Branch"
-		backspaceBinding := key.NewBinding(key.WithKeys("backspace"), key.WithHelp("backspace", "back"))
 		refreshBinding := key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh"))
 		checkoutBinding := key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "checkout"))
+		backspaceBinding := key.NewBinding(key.WithKeys("backspace"), key.WithHelp("backspace", "back"))
 		m.list.AdditionalShortHelpKeys = func() []key.Binding {
 			return []key.Binding{refreshBinding, checkoutBinding, backspaceBinding}
 		}
@@ -111,27 +123,11 @@ func (m Model) handleListItems(items []list.Item) (tea.Model, tea.Cmd) {
 		} else {
 			m.list.Title = "Select From Commit"
 		}
-		// Add backspace key help to go back to commit limit selection
-		backspaceBinding := key.NewBinding(key.WithKeys("backspace"), key.WithHelp("backspace", "back"))
-		m.list.AdditionalShortHelpKeys = func() []key.Binding {
-			return []key.Binding{backspaceBinding}
-		}
-		m.list.AdditionalFullHelpKeys = func() []key.Binding {
-			return []key.Binding{backspaceBinding}
-		}
 	default:
 		if m.selectedBranch != "" {
 			m.list.Title = "Select To Commit (on " + m.selectedBranch + ", after " + m.shortHash(m.fromCommit) + ")"
 		} else {
 			m.list.Title = "Select To Commit (after " + m.shortHash(m.fromCommit) + ")"
-		}
-		// Add backspace key help for To commit screen
-		backspaceBinding := key.NewBinding(key.WithKeys("backspace"), key.WithHelp("backspace", "back"))
-		m.list.AdditionalShortHelpKeys = func() []key.Binding {
-			return []key.Binding{backspaceBinding}
-		}
-		m.list.AdditionalFullHelpKeys = func() []key.Binding {
-			return []key.Binding{backspaceBinding}
 		}
 	}
 	return m, nil
@@ -295,9 +291,14 @@ func (m Model) handleKeyLimitCustom(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyFromCommit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if key := msg.String(); !m.list.SettingFilter() && (key == "i" || key == "I") {
+		m.inclusiveMode = !m.inclusiveMode
+		return m, nil
+	}
 	if msg.String() == "enter" && !m.list.SettingFilter() {
 		if item := m.list.SelectedItem(); item != nil {
-			m.fromCommit = item.(commitItem).sha
+			sha := item.(commitItem).sha
+			m.fromCommit = m.getFromCommit(sha)
 			m.state = stateToCommit
 			if m.selectedBranch != "" {
 				return m, m.loadToCommitsOnBranchCmd
@@ -315,7 +316,12 @@ func (m Model) handleKeyFromCommit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyToCommit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if key := msg.String(); !m.list.SettingFilter() && (key == "i" || key == "I") {
+		m.inclusiveMode = !m.inclusiveMode
+		return m, nil
+	}
 	if msg.String() == "enter" && !m.list.SettingFilter() {
+		m.fromCommit = m.getFromCommit(m.fromCommit)
 		if item := m.list.SelectedItem(); item != nil {
 			m.toCommit = item.(commitItem).sha
 			return m, m.loadRangeStatsCmd
@@ -335,6 +341,10 @@ func (m Model) handleKeyToCommit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleKeyCommitRangeSummary(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "i", "I":
+		m.inclusiveMode = !m.inclusiveMode
+		m.fromCommit = m.getFromCommit(m.fromCommit)
+		return m.Update(m.loadRangeStatsCmd())
 	case "enter", "y", "Y":
 		return m, m.loadFilesCmd
 	case "backspace", "n", "N":
@@ -384,7 +394,7 @@ func (m Model) handleKeyFileSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "backspace":
 		m.clearFilter()
-		m.state = stateToCommit
+		m.state = stateCommitRangeSummary
 		return m, m.loadToCommitsCmd
 	case "c", "C":
 		m.clearFilter()
@@ -520,4 +530,14 @@ func (m *Model) moveCursor(delta int) {
 		return
 	}
 	m.cursor = (m.cursor + delta + n) % n
+}
+
+func (m Model) getFromCommit(sha string) string {
+	if !m.inclusiveMode {
+		return strings.TrimSuffix(sha, "^")
+	} else if m.inclusiveMode && !strings.HasSuffix(m.fromCommit, "^") && m.gitClient.IsValid(sha+"^") {
+		return sha + "^"
+	}
+
+	return sha
 }

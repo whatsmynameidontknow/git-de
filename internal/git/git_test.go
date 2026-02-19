@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -362,5 +363,45 @@ func TestClient_GetRecentCommits(t *testing.T) {
 
 	if !commits[0].Time.Equal(commitTime.Truncate(time.Millisecond)) {
 		t.Errorf("Expected first commit date to be %s, got %s", commitTime, commits[0].Time)
+	}
+}
+
+func TestClient_IsCommitValid(t *testing.T) {
+	repoDir := setupTestRepo(t)
+
+	for i := range 3 {
+		runGit(t, repoDir, "commit", "--allow-empty", "-m", "commit "+strconv.Itoa(i))
+	}
+
+	c := NewClient(repoDir)
+
+	commits, _ := c.GetRecentCommits(3)
+
+	if !c.IsValid(commits[0].Hash) {
+		t.Errorf("Expected %s to be valid", commits[0].Hash)
+	}
+
+	if sha := commits[1].Hash + "^"; !c.IsValid(sha) {
+		t.Errorf("Expected %s to be valid", sha)
+	}
+
+	if sha := commits[2].Hash + "^"; c.IsValid(sha) {
+		t.Errorf("Expected %s to be invalid", sha)
+	}
+
+	if sha := "HEAD~1"; !c.IsValid(sha) {
+		t.Errorf("Expected %s to be valid", sha)
+	}
+
+	if sha := "HEAD~2^"; c.IsValid(sha) {
+		t.Errorf("Expected %s to be invalid", sha)
+	}
+
+	runGit(t, repoDir, "checkout", "-b", "a")
+	if branchName := "a"; !c.IsValid(branchName) {
+		t.Errorf("Expected %s to be valid", branchName)
+	}
+	if branchName := "b"; c.IsValid(branchName) {
+		t.Errorf("Expected %s to be invalid", branchName)
 	}
 }

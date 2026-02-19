@@ -7,13 +7,15 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 // View renders the current TUI state.
 func (m Model) View() string {
 	var sb strings.Builder
 
-	sb.WriteString(titleStyle.Render(m.titleText) + "\n\n")
+	m.viewTopBar(&sb)
 
 	switch m.state {
 	case stateBranchSelection:
@@ -25,7 +27,10 @@ func (m Model) View() string {
 	case stateCommitLimitCustom:
 		m.viewLimitCustom(&sb)
 
-	case stateFromCommit, stateToCommit:
+	case stateFromCommit:
+		sb.WriteString(m.list.View())
+
+	case stateToCommit:
 		sb.WriteString(m.list.View())
 
 	case stateCommitRangeSummary:
@@ -54,6 +59,25 @@ func (m Model) View() string {
 	return sb.String()
 }
 
+func (m Model) viewTopBar(sb *strings.Builder) {
+	if m.state < stateFromCommit || m.state > stateFileSelection {
+		fmt.Fprintf(sb, "%s\n\n", topBarBlockStyle.Render(topBarItemStyle.Render(m.titleText)))
+		return
+	}
+
+	titleText := topBarItemStyle.Render(m.titleText)
+
+	inclusiveModeText := topBarItemStyle.Render("INCLUSIVE MODE [")
+	if m.inclusiveMode {
+		inclusiveModeText += topBarOKStatusStyle.Render("Y")
+	} else {
+		inclusiveModeText += topBarItemStyle.Render("N")
+	}
+	inclusiveModeText += topBarItemStyle.Render("]")
+
+	fmt.Fprint(sb, topBarBlockStyle.Width(max(lipgloss.Width(inclusiveModeText), lipgloss.Width(titleText))+2).Render(titleText+"\n"+inclusiveModeText)+"\n")
+}
+
 func (m Model) viewLimitCustom(sb *strings.Builder) {
 	sb.WriteString("Enter Custom Commit Limit:\n\n")
 	sb.WriteString(m.limitInput.View())
@@ -75,7 +99,7 @@ func (m Model) viewCommitRangeSummary(sb *strings.Builder) {
 	fmt.Fprintf(sb, "Files changed:  %s\n", totalStyle.Render(strconv.Itoa(m.rangeStats.FilesChanged)))
 	fmt.Fprintf(sb, "Additions:      %s\n", successStyle.Render(fmt.Sprintf("+%d", m.rangeStats.Additions)))
 	fmt.Fprintf(sb, "Deletions:      %s\n", errorStyle.Render(fmt.Sprintf("-%d", m.rangeStats.Deletions)))
-	sb.WriteString("\n[enter:proceed] [backspace:change range] [esc:quit]\n")
+	sb.WriteString("\n[enter:proceed] [i/I:toggle inclusive mode] [backspace:change range] [esc:quit]\n")
 }
 
 func (m Model) viewFileSelection(sb *strings.Builder) {

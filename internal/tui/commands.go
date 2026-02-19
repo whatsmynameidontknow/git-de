@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -46,11 +47,12 @@ func (m Model) loadToCommitsOnBranchCmd() tea.Msg {
 	if err != nil {
 		return err
 	}
+	fromCommit := strings.TrimSuffix(m.fromCommit, "^")
 	// Filter to only commits after fromCommit
 	var items []list.Item
 	foundFrom := false
 	for _, c := range commits {
-		if c.Hash == m.fromCommit {
+		if c.Hash == fromCommit {
 			foundFrom = true
 			continue
 		}
@@ -62,7 +64,7 @@ func (m Model) loadToCommitsOnBranchCmd() tea.Msg {
 	if !foundFrom {
 		items = nil
 		for _, c := range commits {
-			if c.Hash != m.fromCommit {
+			if c.Hash != fromCommit {
 				items = append(items, newCommitItem(c))
 			}
 		}
@@ -75,6 +77,7 @@ func (m Model) loadRangeStatsCmd() tea.Msg {
 	if err != nil {
 		return err
 	}
+
 	return stats
 }
 

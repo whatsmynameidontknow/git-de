@@ -48,6 +48,9 @@ type Model struct {
 	inputMode   bool // for file filter
 	filterInput textinput.Model
 
+	// Inclusive mode (include FROM commit changes by using commit^)
+	inclusiveMode bool
+
 	// Output path input focus
 	outputInputFocused bool
 
@@ -70,8 +73,9 @@ type gitClient interface {
 	GetCommitRangeStats(from, to string) (stats git.CommitRangeStats, err error)
 	GetRecentCommits(n int) (commits []git.Commit, err error)
 	GetCommitsAfter(from string, n int) (commits []git.Commit, err error)
-	exporter.GitExporter
 	CheckoutBranch(branch string) (err error)
+	IsValid(sha string) (ok bool)
+	exporter.GitExporter
 }
 
 // NewModel creates a new TUI model with optional pre-filled commit range.

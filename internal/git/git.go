@@ -188,3 +188,10 @@ func (c *Client) getCommits(name string, args ...string) ([]Commit, error) {
 
 	return commits, scanner.Err()
 }
+
+func (c Client) IsValid(sha string) bool {
+	cmd := exec.Command("git", "rev-parse", sha)
+	cmd.Dir = c.workDir
+
+	return cmd.Run() == nil
+}
