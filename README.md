@@ -48,6 +48,8 @@ git-de [options] <from-commit> [<to-commit>]
  - Specifying `-o` or `-a` without `from-commit` will go into TUI mode and ignore the output/archive flags, prompting for commits and output interactively.
  - In TUI mode, you select commits from a list. While you can pass branch names or tags as command-line arguments (e.g., `git-de main`), the interactive commit picker displays only commit SHAs.
 
+> **TUI Inclusive Mode**: Press `i` or `I` in the TUI to toggle "inclusive mode." When enabled, the diff includes changes from the FROM commit itself (equivalent to using `commit^` syntax).
+
 ### Examples
 
 ```bash
