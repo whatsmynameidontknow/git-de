@@ -120,6 +120,8 @@ func TestValidatePath_WindowsValid(t *testing.T) {
 		`export`,
 		`my-export-dir`,
 		`file with spaces`,
+		`..\outside current dir`,
+		`.\curent-directory`,
 	}
 
 	for _, path := range paths {

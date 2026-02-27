@@ -51,8 +51,11 @@ func validateWindowsPath(path string) error {
 	remainder := strings.TrimPrefix(path, volume)
 	remainder = strings.ReplaceAll(remainder, "/", "\\")
 
-	for segment := range strings.SplitSeq(remainder, "\\") {
+	for i, segment := range strings.Split(remainder, "\\") {
 		if segment == "" {
+			continue
+		}
+		if i == 0 && segment == ".." {
 			continue
 		}
 
